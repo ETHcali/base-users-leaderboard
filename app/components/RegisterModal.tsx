@@ -34,6 +34,7 @@ const COUNTRIES = [
 export function RegisterModal({ walletAddress, onClose, onSuccess }: Props) {
   const [form, setForm] = useState({
     name: '',
+    email: '',
     x_username: '',
     telegram_handle: '',
     country_code: '',
@@ -45,17 +46,23 @@ export function RegisterModal({ walletAddress, onClose, onSuccess }: Props) {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 
+  function isValidEmail(email: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!form.name.trim()) return setError('Name is required.')
+    if (form.email && !isValidEmail(form.email)) return setError('Enter a valid email address.')
     if (whatsapp && !isValidPhoneNumber(whatsapp)) return setError('Enter a valid WhatsApp number with country code.')
 
     setLoading(true)
     const payload: UserProfile = {
       wallet_address: walletAddress.toLowerCase(),
       name: form.name.trim(),
+      email: form.email.trim() || null,
       x_username: form.x_username.replace(/^@/, '').trim() || null,
       telegram_handle: form.telegram_handle.replace(/^@/, '').trim() || null,
       whatsapp: whatsapp ?? null,
@@ -97,6 +104,18 @@ export function RegisterModal({ walletAddress, onClose, onSuccess }: Props) {
               value={form.name}
               onChange={set('name')}
               placeholder="Your name"
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-600"
+            />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={set('email')}
+              placeholder="your@email.com"
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-600"
             />
           </div>

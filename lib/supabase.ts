@@ -8,6 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export type UserProfile = {
   wallet_address: string
   name: string
+  email: string | null
   x_username: string | null
   telegram_handle: string | null
   whatsapp: string | null
