@@ -17,8 +17,8 @@ const CHAIN_OPTIONS = Object.keys(CHAINS)
 // POAPs live on Gnosis chain (POAP protocol)
 const POAP_CHAIN = 'gnosis'
 
-type PoapSource = { id: number; event_id: number; name: string; created_at: string }
-type NftSource  = { id: number; address: string; chain: string; name: string; created_at: string }
+type PoapSource = { id: number; event_id: number; name: string; created_at: string; holder_count: number; last_synced_at: string | null }
+type NftSource  = { id: number; address: string; chain: string; name: string; created_at: string; holder_count: number; last_synced_at: string | null }
 type UnifiedRow =
   | (PoapSource & { kind: 'poap'; chain: string })
   | (NftSource  & { kind: 'nft' })
@@ -77,6 +77,7 @@ export default function SourcesPage() {
 
   // sync
   const [syncing, setSyncing] = useState(false)
+  const [syncingRow, setSyncingRow] = useState<string | null>(null) // 'poap-{id}' or 'nft-{addr}'
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
 
@@ -139,12 +140,29 @@ export default function SourcesPage() {
   async function runSync() {
     setSyncing(true); setSyncResult(null); setSyncError(null)
     try {
-      const res = await fetch('/api/sync', { method: 'POST' })
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
       if (!res.ok) throw new Error(`Server error: ${res.status}`)
       const data: SyncResult = await res.json()
-      setSyncResult(data); loadDatasetCount()
+      setSyncResult(data); loadSources(); loadDatasetCount()
     } catch (err) { setSyncError(String(err)) }
     finally { setSyncing(false) }
+  }
+
+  async function syncOne(row: UnifiedRow) {
+    const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
+    setSyncingRow(key)
+    try {
+      const body = row.kind === 'poap'
+        ? { type: 'poap', id: row.event_id }
+        : { type: 'nft', id: row.address }
+      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      loadSources(); loadDatasetCount()
+    } catch (err) {
+      setSyncError(String(err))
+    } finally {
+      setSyncingRow(null)
+    }
   }
 
   // Unified rows
@@ -336,7 +354,8 @@ export default function SourcesPage() {
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">ID / Address</th>
-              <th className="px-4 py-3 text-right">Added</th>
+              <th className="px-4 py-3 text-right">Holders</th>
+              <th className="px-4 py-3 text-right">Last sync</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -385,16 +404,39 @@ export default function SourcesPage() {
                     </a>
                   )}
                 </td>
+                <td className="px-4 py-3 text-right">
+                  {row.holder_count > 0
+                    ? <span className="text-white font-semibold text-sm">{row.holder_count.toLocaleString()}</span>
+                    : <span className="text-gray-600 text-xs">—</span>}
+                </td>
                 <td className="px-4 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
-                  {new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {row.last_synced_at
+                    ? new Date(row.last_synced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : <span className="text-gray-700">never</span>}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)}
-                    className="text-gray-600 hover:text-red-400 text-xs px-2 py-1 rounded-lg hover:bg-red-900/20 transition-colors"
-                  >
-                    ✕ Remove
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    {(() => {
+                      const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
+                      const isSyncing = syncingRow === key
+                      return (
+                        <button
+                          onClick={() => syncOne(row)}
+                          disabled={isSyncing || syncing}
+                          className="text-emerald-600 hover:text-emerald-400 disabled:opacity-40 text-xs px-2 py-1 rounded-lg hover:bg-emerald-900/20 transition-colors"
+                          title="Sync this source"
+                        >
+                          {isSyncing ? <span className="animate-spin inline-block">⟳</span> : '⟳'}
+                        </button>
+                      )
+                    })()}
+                    <button
+                      onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)}
+                      className="text-gray-600 hover:text-red-400 text-xs px-2 py-1 rounded-lg hover:bg-red-900/20 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

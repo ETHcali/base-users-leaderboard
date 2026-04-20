@@ -78,47 +78,96 @@ async function fetchNftHolders(address: string, chain: string, name: string) {
   return { source: `NFT ${chain}:${name}`, count: addresses.size, addresses }
 }
 
-export async function POST() {
+// Body shape:
+//   {} or omitted          → sync all sources
+//   { type: 'poap', id }   → sync one POAP event
+//   { type: 'nft', id }    → sync one NFT contract (id = address)
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}))
+  const target: { type?: 'poap' | 'nft'; id?: string | number } = body ?? {}
+
   const t0 = Date.now()
   const bySource: { source: string; count: number; error?: string }[] = []
   const allAddresses = new Set<string>()
 
-  // Load sources from Supabase
-  const [{ data: poaps }, { data: nfts }] = await Promise.all([
-    supabase.from('poap_sources').select('*'),
-    supabase.from('nft_sources').select('*'),
-  ])
+  if (target.type === 'poap' && target.id) {
+    // Single POAP sync
+    const eventId = Number(target.id)
+    const { data: row } = await supabase.from('poap_sources').select('*').eq('event_id', eventId).single()
+    if (!row) return NextResponse.json({ error: 'POAP source not found' }, { status: 404 })
 
-  // Fetch POAP holders
-  for (const poap of poaps ?? []) {
     try {
-      const result = await fetchPoapHolders(poap.event_id, poap.name)
+      const result = await fetchPoapHolders(eventId, row.name)
       result.addresses.forEach(a => allAddresses.add(a))
       bySource.push({ source: result.source, count: result.count })
+      await supabase.from('poap_sources').update({
+        holder_count: result.count,
+        last_synced_at: new Date().toISOString(),
+      }).eq('event_id', eventId)
     } catch (err) {
-      bySource.push({ source: `POAP #${poap.event_id} — ${poap.name}`, count: 0, error: String(err) })
+      bySource.push({ source: `POAP #${eventId}`, count: 0, error: String(err) })
     }
-    await sleep(400)
-  }
 
-  // Fetch NFT holders
-  for (const nft of nfts ?? []) {
+  } else if (target.type === 'nft' && target.id) {
+    // Single NFT sync
+    const address = String(target.id).toLowerCase()
+    const { data: row } = await supabase.from('nft_sources').select('*').eq('address', address).single()
+    if (!row) return NextResponse.json({ error: 'NFT source not found' }, { status: 404 })
+
     try {
-      const result = await fetchNftHolders(nft.address, nft.chain, nft.name)
+      const result = await fetchNftHolders(row.address, row.chain, row.name)
       result.addresses.forEach(a => allAddresses.add(a))
       bySource.push({ source: result.source, count: result.count })
+      await supabase.from('nft_sources').update({
+        holder_count: result.count,
+        last_synced_at: new Date().toISOString(),
+      }).eq('address', address)
     } catch (err) {
-      bySource.push({ source: `NFT ${nft.chain}:${nft.name}`, count: 0, error: String(err) })
+      bySource.push({ source: `NFT ${row.chain}:${row.name}`, count: 0, error: String(err) })
     }
-    await sleep(400)
+
+  } else {
+    // Sync all sources
+    const [{ data: poaps }, { data: nfts }] = await Promise.all([
+      supabase.from('poap_sources').select('*'),
+      supabase.from('nft_sources').select('*'),
+    ])
+
+    for (const poap of poaps ?? []) {
+      try {
+        const result = await fetchPoapHolders(poap.event_id, poap.name)
+        result.addresses.forEach(a => allAddresses.add(a))
+        bySource.push({ source: result.source, count: result.count })
+        await supabase.from('poap_sources').update({
+          holder_count: result.count,
+          last_synced_at: new Date().toISOString(),
+        }).eq('event_id', poap.event_id)
+      } catch (err) {
+        bySource.push({ source: `POAP #${poap.event_id} — ${poap.name}`, count: 0, error: String(err) })
+      }
+      await sleep(400)
+    }
+
+    for (const nft of nfts ?? []) {
+      try {
+        const result = await fetchNftHolders(nft.address, nft.chain, nft.name)
+        result.addresses.forEach(a => allAddresses.add(a))
+        bySource.push({ source: result.source, count: result.count })
+        await supabase.from('nft_sources').update({
+          holder_count: result.count,
+          last_synced_at: new Date().toISOString(),
+        }).eq('address', nft.address)
+      } catch (err) {
+        bySource.push({ source: `NFT ${nft.chain}:${nft.name}`, count: 0, error: String(err) })
+      }
+      await sleep(400)
+    }
   }
 
-  // Upsert into dataset_addresses in batches of 500
+  // Upsert collected addresses into dataset_addresses
   const rows = [...allAddresses].map(a => ({ address: a, updated_at: new Date().toISOString() }))
   for (let i = 0; i < rows.length; i += 500) {
-    await supabase
-      .from('dataset_addresses')
-      .upsert(rows.slice(i, i + 500), { onConflict: 'address' })
+    await supabase.from('dataset_addresses').upsert(rows.slice(i, i + 500), { onConflict: 'address' })
   }
 
   return NextResponse.json({
