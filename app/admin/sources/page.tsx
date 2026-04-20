@@ -14,14 +14,13 @@ const CHAINS: Record<string, { label: string; logo: string }> = {
 }
 const CHAIN_OPTIONS = Object.keys(CHAINS)
 
-// POAPs live on Gnosis chain (POAP protocol)
-const POAP_CHAIN = 'gnosis'
-
-type PoapSource = { id: number; event_id: number; name: string; created_at: string; holder_count: number; last_synced_at: string | null }
+type PoapSource = { id: number; event_id: number; name: string; chain: string; created_at: string; holder_count: number; last_synced_at: string | null }
 type NftSource  = { id: number; address: string; chain: string; name: string; created_at: string; holder_count: number; last_synced_at: string | null }
 type UnifiedRow =
-  | (PoapSource & { kind: 'poap'; chain: string })
+  | (PoapSource & { kind: 'poap' })
   | (NftSource  & { kind: 'nft' })
+
+type EditState = { name: string; chain: string }
 
 type SyncResult = {
   total: number
@@ -65,6 +64,7 @@ export default function SourcesPage() {
   // POAP form
   const [newPoapId, setNewPoapId] = useState('')
   const [newPoapName, setNewPoapName] = useState('')
+  const [newPoapChain, setNewPoapChain] = useState('gnosis')
   const [addingPoap, setAddingPoap] = useState(false)
   const [poapError, setPoapError] = useState<string | null>(null)
 
@@ -77,9 +77,14 @@ export default function SourcesPage() {
 
   // sync
   const [syncing, setSyncing] = useState(false)
-  const [syncingRow, setSyncingRow] = useState<string | null>(null) // 'poap-{id}' or 'nft-{addr}'
+  const [syncingRow, setSyncingRow] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+
+  // inline edit
+  const [editingRow, setEditingRow] = useState<string | null>(null) // 'poap-{id}' or 'nft-{addr}'
+  const [editState, setEditState] = useState<EditState>({ name: '', chain: '' })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { loadSources(); loadDatasetCount() }, [])
 
@@ -106,11 +111,11 @@ export default function SourcesPage() {
     if (!newPoapName.trim()) return setPoapError('Name is required.')
     setAddingPoap(true)
     const { error } = await supabase.from('poap_sources').upsert(
-      { event_id: eventId, name: newPoapName.trim() }, { onConflict: 'event_id' }
+      { event_id: eventId, name: newPoapName.trim(), chain: newPoapChain }, { onConflict: 'event_id' }
     )
     setAddingPoap(false)
     if (error) return setPoapError(error.message)
-    setNewPoapId(''); setNewPoapName(''); setPanel('none')
+    setNewPoapId(''); setNewPoapName(''); setNewPoapChain('gnosis'); setPanel('none')
     loadSources()
   }
 
@@ -125,6 +130,25 @@ export default function SourcesPage() {
     setAddingNft(false)
     if (error) return setNftError(error.message)
     setNewNftAddr(''); setNewNftName(''); setNewNftChain('base'); setPanel('none')
+    loadSources()
+  }
+
+  function startEdit(row: UnifiedRow) {
+    const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
+    setEditingRow(key)
+    setEditState({ name: row.name, chain: row.chain })
+  }
+
+  async function saveEdit(row: UnifiedRow) {
+    if (!editState.name.trim()) return
+    setSaving(true)
+    if (row.kind === 'poap') {
+      await supabase.from('poap_sources').update({ name: editState.name.trim(), chain: editState.chain }).eq('id', row.id)
+    } else {
+      await supabase.from('nft_sources').update({ name: editState.name.trim(), chain: editState.chain }).eq('id', row.id)
+    }
+    setSaving(false)
+    setEditingRow(null)
     loadSources()
   }
 
@@ -165,9 +189,9 @@ export default function SourcesPage() {
     }
   }
 
-  // Unified rows
+  // Unified rows — POAPs use their own chain column now
   const unified: UnifiedRow[] = [
-    ...poaps.map(p => ({ ...p, kind: 'poap' as const, chain: POAP_CHAIN })),
+    ...poaps.map(p => ({ ...p, kind: 'poap' as const })),
     ...nfts.map(n => ({ ...n, kind: 'nft' as const })),
   ]
 
@@ -215,16 +239,20 @@ export default function SourcesPage() {
       {/* Add POAP panel */}
       {panel === 'poap' && (
         <div className="bg-blue-950/40 border border-blue-800/50 rounded-2xl p-5">
-          <h3 className="font-semibold text-blue-200 mb-4 flex items-center gap-2">
-            <img src={CHAINS.gnosis.logo} alt="Gnosis" className="w-5 h-5 rounded-full" />
-            Add POAP Event <span className="text-blue-500 text-xs font-normal">— always on Gnosis chain</span>
-          </h3>
+          <h3 className="font-semibold text-blue-200 mb-4">Add POAP Event</h3>
           <form onSubmit={addPoap} className="flex gap-3 flex-wrap items-end">
             <div>
               <label className="text-xs text-blue-400 mb-1 block">Event ID *</label>
               <input type="number" value={newPoapId} onChange={e => setNewPoapId(e.target.value)}
                 placeholder="e.g. 147806" autoFocus
                 className="w-36 bg-gray-900 border border-blue-700/50 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-blue-400 mb-1 block">Chain</label>
+              <select value={newPoapChain} onChange={e => setNewPoapChain(e.target.value)}
+                className="bg-gray-900 border border-blue-700/50 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+                {CHAIN_OPTIONS.map(c => <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>)}
+              </select>
             </div>
             <div className="flex-1 min-w-52">
               <label className="text-xs text-blue-400 mb-1 block">Event name *</label>
@@ -378,68 +406,105 @@ export default function SourcesPage() {
                   </div>
                 </td>
               </tr>
-            ) : filtered.map(row => (
-              <tr key={row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`}
-                className="border-b border-gray-800 last:border-0 hover:bg-gray-900/50 transition-colors">
-                <td className="px-4 py-3">
-                  <ChainBadge chain={row.chain} />
-                </td>
-                <td className="px-4 py-3">
-                  <TypeBadge kind={row.kind} />
-                </td>
-                <td className="px-4 py-3 text-white font-medium max-w-xs truncate" title={row.name}>
-                  {row.name}
-                </td>
-                <td className="px-4 py-3 font-mono text-xs">
-                  {row.kind === 'poap' ? (
-                    <a href={`https://poap.gallery/drops/${row.event_id}`} target="_blank" rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300">
-                      #{row.event_id}
-                    </a>
-                  ) : (
-                    <a href={`https://${row.chain === 'base' ? 'base' : row.chain === 'optimism' ? 'optimism' : row.chain === 'polygon' ? 'polygon' : 'eth'}.blockscout.com/address/${row.address}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-purple-400 hover:text-purple-300">
-                      {row.address.slice(0, 8)}…{row.address.slice(-6)}
-                    </a>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {row.holder_count > 0
-                    ? <span className="text-white font-semibold text-sm">{row.holder_count.toLocaleString()}</span>
-                    : <span className="text-gray-600 text-xs">—</span>}
-                </td>
-                <td className="px-4 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
-                  {row.last_synced_at
-                    ? new Date(row.last_synced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                    : <span className="text-gray-700">never</span>}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {(() => {
-                      const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
-                      const isSyncing = syncingRow === key
-                      return (
+            ) : filtered.map(row => {
+              const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
+              const isEditing = editingRow === key
+              const isSyncing = syncingRow === key
+
+              if (isEditing) {
+                return (
+                  <tr key={key} className="border-b border-gray-800 bg-gray-900/80">
+                    {/* Chain selector */}
+                    <td className="px-3 py-2">
+                      <select
+                        value={editState.chain}
+                        onChange={e => setEditState(s => ({ ...s, chain: e.target.value }))}
+                        className="bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 w-28"
+                      >
+                        {CHAIN_OPTIONS.map(c => (
+                          <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>
+                        ))}
+                      </select>
+                    </td>
+                    {/* Type — not editable */}
+                    <td className="px-3 py-2"><TypeBadge kind={row.kind} /></td>
+                    {/* Name input */}
+                    <td className="px-3 py-2" colSpan={2}>
+                      <input
+                        value={editState.name}
+                        onChange={e => setEditState(s => ({ ...s, name: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') saveEdit(row); if (e.key === 'Escape') setEditingRow(null) }}
+                        autoFocus
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </td>
+                    {/* Holders + last sync — read-only in edit */}
+                    <td className="px-3 py-2 text-right text-gray-600 text-xs">{row.holder_count > 0 ? row.holder_count.toLocaleString() : '—'}</td>
+                    <td className="px-3 py-2" />
+                    {/* Save / Cancel */}
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => syncOne(row)}
-                          disabled={isSyncing || syncing}
-                          className="text-emerald-600 hover:text-emerald-400 disabled:opacity-40 text-xs px-2 py-1 rounded-lg hover:bg-emerald-900/20 transition-colors"
-                          title="Sync this source"
+                          onClick={() => saveEdit(row)}
+                          disabled={saving || !editState.name.trim()}
+                          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          {isSyncing ? <span className="animate-spin inline-block">⟳</span> : '⟳'}
+                          {saving ? '…' : 'Save'}
                         </button>
-                      )
-                    })()}
-                    <button
-                      onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)}
-                      className="text-gray-600 hover:text-red-400 text-xs px-2 py-1 rounded-lg hover:bg-red-900/20 transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                        <button
+                          onClick={() => setEditingRow(null)}
+                          className="text-gray-500 hover:text-gray-300 text-xs px-2 py-1.5 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }
+
+              return (
+                <tr key={key} className="border-b border-gray-800 last:border-0 hover:bg-gray-900/50 transition-colors group">
+                  <td className="px-4 py-3"><ChainBadge chain={row.chain} /></td>
+                  <td className="px-4 py-3"><TypeBadge kind={row.kind} /></td>
+                  <td className="px-4 py-3 text-white font-medium max-w-xs truncate" title={row.name}>{row.name}</td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {row.kind === 'poap' ? (
+                      <a href={`https://poap.gallery/drops/${row.event_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                        #{row.event_id}
+                      </a>
+                    ) : (
+                      <a href={`https://${row.chain === 'ethereum' ? 'eth' : row.chain}.blockscout.com/address/${row.address}`} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">
+                        {row.address.slice(0, 8)}…{row.address.slice(-6)}
+                      </a>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {row.holder_count > 0
+                      ? <span className="text-white font-semibold text-sm">{row.holder_count.toLocaleString()}</span>
+                      : <span className="text-gray-600 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
+                    {row.last_synced_at
+                      ? new Date(row.last_synced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : <span className="text-gray-700">never</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => startEdit(row)} className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded-lg hover:bg-gray-700 transition-colors" title="Edit">
+                        ✏️
+                      </button>
+                      <button onClick={() => syncOne(row)} disabled={isSyncing || syncing} className="text-emerald-600 hover:text-emerald-400 disabled:opacity-40 text-xs px-2 py-1 rounded-lg hover:bg-emerald-900/20 transition-colors" title="Sync">
+                        {isSyncing ? <span className="animate-spin inline-block">⟳</span> : '⟳'}
+                      </button>
+                      <button onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)} className="text-gray-600 hover:text-red-400 text-xs px-2 py-1 rounded-lg hover:bg-red-900/20 transition-colors" title="Remove">
+                        ✕
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
