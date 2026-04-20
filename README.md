@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ETH Cali — Base Users Leaderboard
 
-## Getting Started
+Onchain activity leaderboard for wallets onboarded by [ETH Cali](https://ethcali.org), a Colombian Web3 education community building the next generation of Latin American builders.
 
-First, run the development server:
+**Live site:** https://web-5dwc86s2h-ekinoxis-team.vercel.app
+
+![ETH Cali](./public/branding/LogoETHCALI%20Horizontal%20-%20Fondo%20Blaco.png)
+
+## What it does
+
+- Displays a ranked leaderboard of all ETH Cali onboarded wallets active on **Base Network**
+- Scores each wallet based on onchain activity (transactions, token volume, contract deployments)
+- Connect your wallet to see your rank and check eligibility for the **ETH Cali OG NFT** (top 30)
+
+## Score formula
+
+| Action | Points |
+|--------|--------|
+| Native transaction | 1 pt each |
+| Token transfer | 2 pts each |
+| $100 token volume | 1 pt |
+| Contract deployed | 3 pts each |
+
+Data source: [Dune Analytics](https://dune.com/ethcali) · Chain: Base · Timeframe: All-time since Aug 2023
+
+## Tech stack
+
+- [Next.js 16](https://nextjs.org) + [Tailwind CSS 4](https://tailwindcss.com)
+- [wagmi v2](https://wagmi.sh) + [RainbowKit v2](https://www.rainbowkit.com) — wallet connect
+- [Dune Analytics API](https://dune.com/docs/api) — onchain data
+- [Vercel](https://vercel.com) — hosting
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env.local   # add your NEXT_PUBLIC_DUNE_API_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+NEXT_PUBLIC_DUNE_API_KEY=your_dune_api_key
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+```
 
-## Learn More
+Get a free WalletConnect project ID at [cloud.walletconnect.com](https://cloud.walletconnect.com).
 
-To learn more about Next.js, take a look at the following resources:
+## Roadmap
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [x] Base Network leaderboard with activity scoring
+- [x] Wallet connect + top 30 eligibility check
+- [ ] User registration — identify yourself to claim benefits
+- [ ] ETH Cali OG NFT claim for top 30 wallets
+- [ ] Multi-chain leaderboard (Ethereum, Optimism, Arbitrum, Polygon)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Links
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [ETH Cali](https://ethcali.org)
+- [Farcaster](https://warpcast.com/ethereumcali.eth)
+- [Twitter](https://twitter.com/ethcali_org)
+- [GitHub](https://github.com/ethcali)
+- [Dune Dashboard](https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-ethcali)
