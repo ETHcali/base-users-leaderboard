@@ -1,7 +1,7 @@
 'use client'
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { useConnection } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { useEffect, useState } from 'react'
 
 const DUNE_QUERY_ID = '6634911'
@@ -66,7 +66,7 @@ function ScoreTooltip({ row }: { row: Row }) {
 }
 
 export default function Home() {
-  const { address, isConnected } = useConnection()
+  const { address, isConnected } = useAccount()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
