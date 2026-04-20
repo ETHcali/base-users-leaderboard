@@ -1,0 +1,208 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase, type UserProfile } from '@/lib/supabase'
+
+const DUNE_QUERY_ID = '6634911'
+const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
+
+type DuneRow = {
+  address: string
+  activity_score: number
+  native_tx_count: number
+  token_tx_count: number
+  total_token_volume_usd: number
+  contracts_deployed: number
+}
+
+type EnrichedUser = UserProfile & {
+  rank: number | null
+  activity_score: number | null
+  native_tx_count: number | null
+  token_tx_count: number | null
+  total_token_volume_usd: number | null
+  contracts_deployed: number | null
+}
+
+const COUNTRY_NAMES: Record<string, string> = {
+  CO: 'Colombia', MX: 'Mexico', AR: 'Argentina', BR: 'Brazil',
+  CL: 'Chile', PE: 'Peru', VE: 'Venezuela', EC: 'Ecuador',
+  BO: 'Bolivia', PY: 'Paraguay', UY: 'Uruguay', CR: 'Costa Rica',
+  PA: 'Panama', GT: 'Guatemala', US: 'United States', ES: 'Spain', OTHER: 'Other',
+}
+
+function fmt(n: number | null) {
+  if (n === null) return '—'
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)
+}
+function fmtUsd(n: number | null) {
+  if (n === null) return '—'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+}
+
+function exportCsv(users: EnrichedUser[]) {
+  const header = 'rank,wallet,name,email,x,telegram,whatsapp,country,score,txns,volume,contracts,registered_at'
+  const body = users.map(u => [
+    u.rank ?? '', u.wallet_address, u.name, u.email ?? '', u.x_username ?? '',
+    u.telegram_handle ?? '', u.whatsapp ?? '', u.country_code ?? '',
+    u.activity_score ?? '', (u.native_tx_count ?? 0) + (u.token_tx_count ?? 0),
+    u.total_token_volume_usd ?? '', u.contracts_deployed ?? '', u.registered_at,
+  ].join(',')).join('\n')
+  const blob = new Blob([header + '\n' + body], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob); const a = document.createElement('a')
+  a.href = url; a.download = 'users.csv'; a.click(); URL.revokeObjectURL(url)
+}
+
+export default function UsersPage() {
+  const [users, setUsers] = useState<EnrichedUser[]>([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'registered_at' | 'rank' | 'activity_score'>('registered_at')
+  const [filterTop30, setFilterTop30] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const [{ data: supaUsers }, duneRes] = await Promise.all([
+        supabase.from('users').select('*').order('registered_at', { ascending: false }),
+        fetch(`https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/results?limit=500`, {
+          headers: { 'X-Dune-API-Key': DUNE_API_KEY },
+        }).then(r => r.json()),
+      ])
+      const duneRows: DuneRow[] = duneRes?.result?.rows ?? []
+      const rankMap = new Map(duneRows.map((r, i) => [r.address.toLowerCase(), { rank: i + 1, ...r }]))
+      const enriched: EnrichedUser[] = (supaUsers ?? []).map(u => {
+        const d = rankMap.get(u.wallet_address.toLowerCase())
+        return { ...u, rank: d?.rank ?? null, activity_score: d?.activity_score ?? null,
+          native_tx_count: d?.native_tx_count ?? null, token_tx_count: d?.token_tx_count ?? null,
+          total_token_volume_usd: d?.total_token_volume_usd ?? null, contracts_deployed: d?.contracts_deployed ?? null }
+      })
+      setUsers(enriched)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const filtered = users
+    .filter(u => {
+      if (filterTop30 && (u.rank === null || u.rank > 30)) return false
+      if (!search) return true
+      const q = search.toLowerCase()
+      return u.wallet_address.includes(q) || u.name.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) || u.x_username?.toLowerCase().includes(q) ||
+        u.telegram_handle?.toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      if (sortBy === 'rank') return (a.rank ?? 9999) - (b.rank ?? 9999)
+      if (sortBy === 'activity_score') return (b.activity_score ?? 0) - (a.activity_score ?? 0)
+      return new Date(b.registered_at).getTime() - new Date(a.registered_at).getTime()
+    })
+
+  return (
+    <div className="p-8 flex flex-col gap-6 max-w-7xl">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Registered Users</h1>
+          <p className="text-gray-400 text-sm mt-1">Users who filled the claim/registration form</p>
+        </div>
+        <div className="flex gap-3 flex-wrap items-center">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm">
+            <span className="text-gray-500">Total</span>
+            <span className="ml-2 font-bold text-white">{users.length}</span>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm">
+            <span className="text-gray-500">Top 30</span>
+            <span className="ml-2 font-bold text-emerald-400">{users.filter(u => u.rank !== null && u.rank <= 30).length}</span>
+          </div>
+          <button onClick={() => exportCsv(filtered)} className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-xl px-4 py-2 transition-colors">
+            ⬇ Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex gap-3 flex-wrap items-center">
+        <input
+          type="text" placeholder="Search name, wallet, email, @handle…" value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-48 bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
+        />
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+          <option value="registered_at">Newest first</option>
+          <option value="rank">Leaderboard rank</option>
+          <option value="activity_score">Score</option>
+        </select>
+        <button
+          onClick={() => setFilterTop30(f => !f)}
+          className={`text-sm rounded-xl px-4 py-2.5 border transition-colors ${filterTop30 ? 'bg-emerald-900 border-emerald-600 text-emerald-300' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}
+        >
+          🏆 Top 30 only
+        </button>
+        <span className="text-xs text-gray-600">{filtered.length} users</span>
+      </div>
+
+      {loading ? (
+        <div className="text-center text-gray-500 py-20">Loading…</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-800">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-400 uppercase tracking-wide border-b border-gray-800 bg-gray-900 text-left">
+                <th className="px-3 py-3">Rank</th>
+                <th className="px-3 py-3">Name</th>
+                <th className="px-3 py-3">Wallet</th>
+                <th className="px-3 py-3">Email</th>
+                <th className="px-3 py-3">X</th>
+                <th className="px-3 py-3">Telegram</th>
+                <th className="px-3 py-3">WhatsApp</th>
+                <th className="px-3 py-3">Country</th>
+                <th className="px-3 py-3 text-right">Score</th>
+                <th className="px-3 py-3 text-right">Txns</th>
+                <th className="px-3 py-3 text-right">Volume</th>
+                <th className="px-3 py-3 text-right">Contracts</th>
+                <th className="px-3 py-3">Registered</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr key={u.wallet_address} className={`border-b border-gray-800 last:border-0 hover:bg-gray-900/50 ${u.rank !== null && u.rank <= 30 ? 'bg-emerald-950/20' : ''}`}>
+                  <td className="px-3 py-2.5 font-mono">
+                    {u.rank !== null
+                      ? <span className={u.rank <= 30 ? 'text-emerald-400 font-bold' : 'text-gray-400'}>#{u.rank}</span>
+                      : <span className="text-gray-600">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 font-medium text-white whitespace-nowrap">{u.name}</td>
+                  <td className="px-3 py-2.5 font-mono">
+                    <a href={`https://basescan.org/address/${u.wallet_address}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                      {u.wallet_address.slice(0, 6)}…{u.wallet_address.slice(-4)}
+                    </a>
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-300">{u.email ?? <span className="text-gray-600">—</span>}</td>
+                  <td className="px-3 py-2.5">
+                    {u.x_username
+                      ? <a href={`https://x.com/${u.x_username}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">@{u.x_username}</a>
+                      : <span className="text-gray-600">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-gray-300">{u.telegram_handle ? `@${u.telegram_handle}` : <span className="text-gray-600">—</span>}</td>
+                  <td className="px-3 py-2.5 text-gray-300">{u.whatsapp ?? <span className="text-gray-600">—</span>}</td>
+                  <td className="px-3 py-2.5 text-gray-300">{u.country_code ? (COUNTRY_NAMES[u.country_code] ?? u.country_code) : <span className="text-gray-600">—</span>}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-white">{fmt(u.activity_score)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-300">{fmt(u.native_tx_count !== null && u.token_tx_count !== null ? u.native_tx_count + u.token_tx_count : null)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-300">{fmtUsd(u.total_token_volume_usd)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-300">{fmt(u.contracts_deployed)}</td>
+                  <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">
+                    {new Date(u.registered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={13} className="text-center text-gray-600 py-12">No users found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
