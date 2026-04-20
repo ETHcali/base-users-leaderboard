@@ -3,6 +3,8 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import { useEffect, useState } from 'react'
+import { RegisterModal } from './components/RegisterModal'
+import { supabase, type UserProfile } from '@/lib/supabase'
 
 const DUNE_QUERY_ID = '6634911'
 const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
@@ -73,6 +75,8 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [hoveredScore, setHoveredScore] = useState<string | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [showRegister, setShowRegister] = useState(false)
 
   useEffect(() => {
     async function fetchLeaderboard() {
@@ -94,6 +98,16 @@ export default function Home() {
     fetchLeaderboard()
   }, [])
 
+  useEffect(() => {
+    if (!address) { setProfile(null); return }
+    supabase
+      .from('users')
+      .select('*')
+      .eq('wallet_address', address.toLowerCase())
+      .maybeSingle()
+      .then(({ data }) => setProfile(data ?? null))
+  }, [address])
+
   const userRank = address
     ? rows.findIndex(r => r.address.toLowerCase() === address.toLowerCase()) + 1
     : 0
@@ -108,6 +122,14 @@ export default function Home() {
     : rows
 
   return (
+    <>
+    {showRegister && address && (
+      <RegisterModal
+        walletAddress={address}
+        onClose={() => setShowRegister(false)}
+        onSuccess={p => { setProfile(p); setShowRegister(false) }}
+      />
+    )}
     <main className="max-w-5xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
 
       {/* Header */}
@@ -143,20 +165,31 @@ export default function Home() {
         }`}>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xl">{isTop30 ? '🏆' : userRank > 0 ? '📊' : '👋'}</span>
-            <div className="flex-1">
+            <div className="flex-1 flex flex-wrap items-center gap-3">
               {isTop30 ? (
-                <span>
-                  <strong>You&apos;re #{userRank} on the leaderboard!</strong> You qualify for the ETH Cali OG NFT.
-                  Stay tuned — the claim will be available soon.
-                </span>
+                <>
+                  <span>
+                    <strong>You&apos;re #{userRank} on the leaderboard!</strong> You qualify for the ETH Cali OG NFT.
+                  </span>
+                  {profile
+                    ? <span className="text-emerald-400 text-xs">✓ Registered as <strong>{profile.name}</strong></span>
+                    : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
+                  }
+                </>
               ) : userRank > 0 ? (
-                <span>
-                  You&apos;re ranked <strong>#{userRank}</strong> out of {rows.length} users
-                  {userRow && (
-                    <> · Score: <strong>{fmt(userRow.activity_score)}</strong>
-                    {' '}({fmt(top30Score - userRow.activity_score)} pts to top 30)</>
-                  )}
-                </span>
+                <>
+                  <span>
+                    You&apos;re ranked <strong>#{userRank}</strong> out of {rows.length} users
+                    {userRow && (
+                      <> · Score: <strong>{fmt(userRow.activity_score)}</strong>
+                      {' '}({fmt(top30Score - userRow.activity_score)} pts to top 30)</>
+                    )}
+                  </span>
+                  {profile
+                    ? <span className="text-blue-400 text-xs">✓ <strong>{profile.name}</strong></span>
+                    : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register profile →</button>
+                  }
+                </>
               ) : (
                 <span>
                   <strong>{shortAddr(address)}</strong> is not in the ETH Cali dataset yet.
@@ -341,5 +374,6 @@ export default function Home() {
         )}
       </footer>
     </main>
+    </>
   )
 }
