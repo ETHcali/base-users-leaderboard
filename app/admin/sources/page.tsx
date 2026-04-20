@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? ''
-const POAP_API_KEY = process.env.NEXT_PUBLIC_POAP_API_KEY ?? ''
 
 const CHAIN_OPTIONS = ['base', 'optimism', 'polygon', 'ethereum', 'unichain']
 
@@ -135,85 +134,17 @@ export default function SourcesPage() {
     setSyncing(true)
     setSyncResult(null)
     setSyncError(null)
-    const t0 = Date.now()
-    const bySource: SyncResult['bySource'] = []
-    const allAddresses = new Set<string>()
-
-    const BLOCKSCOUT: Record<string, string> = {
-      base:     'https://base.blockscout.com',
-      optimism: 'https://optimism.blockscout.com',
-      polygon:  'https://polygon.blockscout.com',
-      ethereum: 'https://eth.blockscout.com',
-      unichain: 'https://unichain.blockscout.com',
+    try {
+      const res = await fetch('/api/sync', { method: 'POST' })
+      if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      const data: SyncResult = await res.json()
+      setSyncResult(data)
+      loadDatasetCount()
+    } catch (err) {
+      setSyncError(String(err))
+    } finally {
+      setSyncing(false)
     }
-
-    // Fetch POAP holders
-    for (const poap of poaps) {
-      try {
-        const addrs = new Set<string>()
-        let offset = 0, total = null
-        while (true) {
-          const res = await fetch(
-            `https://api.poap.tech/event/${poap.event_id}/poaps?limit=300&offset=${offset}`,
-            { headers: { 'x-api-key': POAP_API_KEY } }
-          )
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const data = await res.json()
-          if (!data?.tokens?.length) break
-          total ??= data.total
-          for (const t of data.tokens) {
-            const a = t.owner?.id?.toLowerCase()
-            if (a?.startsWith('0x')) { addrs.add(a); allAddresses.add(a) }
-          }
-          offset += 300
-          if (offset >= (total ?? 0)) break
-        }
-        bySource.push({ source: `POAP #${poap.event_id} — ${poap.name}`, count: addrs.size })
-      } catch (err) {
-        bySource.push({ source: `POAP #${poap.event_id} — ${poap.name}`, count: 0, error: String(err) })
-      }
-    }
-
-    // Fetch NFT holders via Blockscout
-    for (const nft of nfts) {
-      try {
-        const addrs = new Set<string>()
-        const base = BLOCKSCOUT[nft.chain] ?? BLOCKSCOUT.base
-        let nextPageParams: Record<string, string> | null = null
-        while (true) {
-          let url = `${base}/api/v2/tokens/${nft.address}/holders`
-          if (nextPageParams) url += '?' + new URLSearchParams(nextPageParams).toString()
-          const res = await fetch(url)
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const data = await res.json()
-          const items: { address?: { hash?: string } | string }[] = data?.items ?? []
-          if (!items.length) break
-          for (const item of items) {
-            const raw = typeof item.address === 'string' ? item.address : item.address?.hash
-            const a = raw?.toLowerCase()
-            if (a?.startsWith('0x')) { addrs.add(a); allAddresses.add(a) }
-          }
-          nextPageParams = data?.next_page_params ?? null
-          if (!nextPageParams) break
-        }
-        bySource.push({ source: `NFT ${nft.chain}:${nft.name}`, count: addrs.size })
-      } catch (err) {
-        bySource.push({ source: `NFT ${nft.chain}:${nft.name}`, count: 0, error: String(err) })
-      }
-    }
-
-    // Upsert into dataset_addresses
-    const rows = [...allAddresses].map(a => ({ address: a }))
-    if (rows.length > 0) {
-      // Batch upsert in chunks of 500
-      for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('dataset_addresses').upsert(rows.slice(i, i + 500), { onConflict: 'address' })
-      }
-    }
-
-    setSyncResult({ total: allAddresses.size, bySource, durationMs: Date.now() - t0 })
-    setSyncing(false)
-    loadDatasetCount()
   }
 
   if (!authed) {
