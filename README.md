@@ -11,6 +11,10 @@ Onchain activity leaderboard for wallets onboarded by [ETH Cali](https://ethcali
 - Displays a ranked leaderboard of all ETH Cali onboarded wallets active on **Base Network**
 - Scores each wallet based on onchain activity (transactions, token volume, contract deployments)
 - Connect your wallet to see your rank and check eligibility for the **ETH Cali OG NFT** (top 30)
+- **Dashboard metrics**: total native txns, ERC-20 token txns, volume (USD), contracts deployed, top score, avg score, power users, and top-30 cutoff — all live from Dune
+- **User registration**: top-30 wallets can register their name, email, socials, and country
+- **Claim page** (`/claim`): verified top-30 users see their full onchain profile and can submit an OG NFT claim
+- **Admin panel** (`/admin`): password-protected view with all registered users enriched with their Dune leaderboard data
 
 ## Score formula
 
@@ -53,9 +57,14 @@ Get a free WalletConnect project ID at [cloud.walletconnect.com](https://cloud.w
 
 - [x] Base Network leaderboard with activity scoring
 - [x] Wallet connect + top 30 eligibility check
-- [ ] User registration — identify yourself to claim benefits
-- [ ] ETH Cali OG NFT claim for top 30 wallets
+- [x] Dashboard metrics grid (8 live aggregate stats)
+- [x] User registration (name, email, X, Telegram, WhatsApp, country)
+- [x] Admin panel — registered users enriched with leaderboard data
+- [x] Claim page — top-30 wallets see their metrics and submit OG NFT claim
+- [ ] ERC-721 NFT contract on Base — mint OG NFT to top 30 on-chain
+- [ ] Merkle whitelist script — reads top 30 from Dune, updates contract root
 - [ ] Multi-chain leaderboard (Ethereum, Optimism, Arbitrum, Polygon)
+- [ ] Automate dataset sync from POAP API + NFT holders
 
 ## Links
 

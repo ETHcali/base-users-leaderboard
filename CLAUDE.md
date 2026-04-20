@@ -23,11 +23,15 @@ Dashboard: https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-ethcal
 
 | File | Purpose |
 |------|---------|
-| `app/page.tsx` | Main leaderboard page — all UI, Dune fetch, wallet check |
+| `app/page.tsx` | Main leaderboard — Dune fetch, wallet check, 8-metric stats grid, registration flow |
+| `app/claim/page.tsx` | Claim page — top-30 verification, onchain metrics card, OG NFT claim submit |
+| `app/admin/page.tsx` | Password-protected admin — all registered users with Dune data enrichment |
+| `app/components/RegisterModal.tsx` | Registration modal — name, email, socials, country, WhatsApp |
 | `app/providers.tsx` | WagmiProvider + RainbowKitProvider + QueryClientProvider |
-| `app/layout.tsx` | Root layout, metadata, dark theme |
-| `.env.local` | `NEXT_PUBLIC_DUNE_API_KEY` (not committed) |
-| `public/branding/` | ETH Cali logos and assets |
+| `app/layout.tsx` | Root layout, metadata, favicon (ETH Cali branding PNG) |
+| `lib/supabase.ts` | Supabase client + UserProfile type |
+| `.env.local` | `NEXT_PUBLIC_DUNE_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL/KEY`, `NEXT_PUBLIC_ADMIN_PASSWORD` |
+| `public/branding/` | ETH Cali logos — used as favicon and in claim page hero |
 | `docsdune/` | Reference docs: Dune CLI, MCP, and query patterns |
 
 ## Dune data
@@ -42,24 +46,43 @@ Dashboard: https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-ethcal
 score = (native_tx_count × 1) + (token_tx_count × 2) + (total_token_volume_usd / 100) + (contracts_deployed × 3)
 ```
 
-## Environment variables
-
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `NEXT_PUBLIC_DUNE_API_KEY` | `.env.local` + Vercel | Dune API access |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | `.env.local` + Vercel | WalletConnect (get free key at cloud.walletconnect.com) |
-
 ## Reference docs (docsdune/)
 
 - `dunecliskills.md` — Dune CLI commands and patterns
 - `dunemcp.md` — Dune MCP server tools
 - `dunempp.md` — Dune query/dashboard management
 
+## Environment variables
+
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `NEXT_PUBLIC_DUNE_API_KEY` | `.env.local` + Vercel | Dune API access |
+| `NEXT_PUBLIC_SUPABASE_URL` | `.env.local` + Vercel | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `.env.local` + Vercel | Supabase anon key |
+| `NEXT_PUBLIC_ADMIN_PASSWORD` | `.env.local` + Vercel | Admin panel password |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | `.env.local` + Vercel | WalletConnect (get free key at cloud.walletconnect.com) |
+
+## Supabase schema
+
+Table `users`:
+- `wallet_address` TEXT PRIMARY KEY (lowercase)
+- `name` TEXT NOT NULL
+- `email` TEXT
+- `x_username` TEXT
+- `telegram_handle` TEXT
+- `whatsapp` TEXT
+- `country_code` TEXT
+- `registered_at` TIMESTAMPTZ
+
 ## Roadmap
 
-- [ ] Add WalletConnect project ID for production wallet support
-- [ ] User registration DB — wallets identify themselves (name, email, socials) to claim benefits
-- [ ] ERC-721 NFT contract on Base — top 30 wallets can claim OG NFT
+- [x] Base Network leaderboard with activity scoring
+- [x] 8-metric dashboard stats grid (live from Dune)
+- [x] User registration (name, email, socials, country) via Supabase
+- [x] Admin panel with Dune-enriched user table
+- [x] /claim page — verified top-30 users see metrics + OG NFT claim flow
+- [x] ETH Cali branding favicon
+- [ ] ERC-721 NFT contract on Base — mint OG NFT to top 30 on-chain
 - [ ] Merkle whitelist script — reads top 30 from Dune API, updates contract root
 - [ ] Expand leaderboard to Ethereum, Optimism, Arbitrum, Polygon
 - [ ] Automate dataset sync from POAP API + NFT holders

@@ -8,6 +8,13 @@ const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "ETH Cali — Base Leaderboard",
   description: "Onchain activity leaderboard for ETH Cali onboarded users on Base",
+  icons: {
+    icon: [
+      { url: '/branding/Open SEA - Ethereum Cali3.png', type: 'image/png' },
+    ],
+    shortcut: '/branding/Open SEA - Ethereum Cali3.png',
+    apple: '/branding/Open SEA - Ethereum Cali3.png',
+  },
 };
 
 export default function RootLayout({

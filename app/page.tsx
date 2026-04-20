@@ -3,6 +3,7 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { RegisterModal } from './components/RegisterModal'
 import { supabase, type UserProfile } from '@/lib/supabase'
 
@@ -127,7 +128,7 @@ export default function Home() {
       <RegisterModal
         walletAddress={address}
         onClose={() => setShowRegister(false)}
-        onSuccess={p => { setProfile(p); setShowRegister(false) }}
+        onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/claim' }}
       />
     )}
     <main className="max-w-5xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
@@ -171,10 +172,13 @@ export default function Home() {
                   <span>
                     <strong>You&apos;re #{userRank} on the leaderboard!</strong> You qualify for the ETH Cali OG NFT.
                   </span>
-                  {profile
-                    ? <span className="text-emerald-400 text-xs">✓ Registered as <strong>{profile.name}</strong></span>
-                    : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
-                  }
+                  {profile ? (
+                    <Link href="/claim" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      🏅 Claim your NFT →
+                    </Link>
+                  ) : (
+                    <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
+                  )}
                 </>
               ) : userRank > 0 ? (
                 <>
@@ -215,24 +219,90 @@ export default function Home() {
         </div>
       )}
 
-      {/* Stats row */}
-      {!loading && rows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Total Users', value: fmt(rows.length), icon: '👥' },
-            { label: 'Top Score', value: fmt(rows[0]?.activity_score ?? 0), icon: '🏆' },
-            { label: 'Total Token Volume', value: fmtUsd(rows.reduce((s, r) => s + r.total_token_volume_usd, 0)), icon: '💸' },
-            { label: 'Total Transactions', value: fmt(rows.reduce((s, r) => s + r.native_tx_count + r.token_tx_count, 0)), icon: '⚡' },
-          ].map(s => (
-            <div key={s.label} className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800">
-              <div className="text-gray-500 text-xs mb-1 flex items-center gap-1">
-                <span>{s.icon}</span> {s.label}
+      {/* Stats grid */}
+      {!loading && rows.length > 0 && (() => {
+        const totalNative = rows.reduce((s, r) => s + r.native_tx_count, 0)
+        const totalToken = rows.reduce((s, r) => s + r.token_tx_count, 0)
+        const totalVolume = rows.reduce((s, r) => s + r.total_token_volume_usd, 0)
+        const totalContracts = rows.reduce((s, r) => s + r.contracts_deployed, 0)
+        const totalTxns = totalNative + totalToken
+        const avgScore = Math.round(rows.reduce((s, r) => s + r.activity_score, 0) / rows.length)
+        const activeBuilders = rows.filter(r => r.contracts_deployed > 0).length
+        const heavyUsers = rows.filter(r => r.native_tx_count + r.token_tx_count >= 10).length
+
+        const stats = [
+          {
+            label: 'Tracked Wallets',
+            value: fmt(rows.length),
+            sub: `${fmt(activeBuilders)} deployed contracts`,
+            icon: '👥',
+            color: 'text-white',
+          },
+          {
+            label: 'Total Transactions',
+            value: fmt(totalTxns),
+            sub: `${fmt(heavyUsers)} power users (10+ txns)`,
+            icon: '⚡',
+            color: 'text-yellow-400',
+          },
+          {
+            label: 'Native ETH Txns',
+            value: fmt(totalNative),
+            sub: `avg ${fmt(Math.round(totalNative / rows.length))} per wallet`,
+            icon: '🔁',
+            color: 'text-blue-400',
+          },
+          {
+            label: 'ERC-20 Token Txns',
+            value: fmt(totalToken),
+            sub: `avg ${fmt(Math.round(totalToken / rows.length))} per wallet`,
+            icon: '🪙',
+            color: 'text-purple-400',
+          },
+          {
+            label: 'ERC-20 Volume (USD)',
+            value: fmtUsd(totalVolume),
+            sub: `avg ${fmtUsd(Math.round(totalVolume / rows.length))} per wallet`,
+            icon: '💸',
+            color: 'text-emerald-400',
+          },
+          {
+            label: 'Contracts Deployed',
+            value: fmt(totalContracts),
+            sub: `${fmt(activeBuilders)} unique builders`,
+            icon: '📜',
+            color: 'text-orange-400',
+          },
+          {
+            label: 'Top Score',
+            value: fmt(rows[0]?.activity_score ?? 0),
+            sub: `avg score ${fmt(avgScore)}`,
+            icon: '🏆',
+            color: 'text-amber-400',
+          },
+          {
+            label: 'Top 30 Cutoff',
+            value: fmt(rows[TOP_N - 1]?.activity_score ?? 0),
+            sub: `${fmt(rows.length - TOP_N)} wallets outside top 30`,
+            icon: '🎯',
+            color: 'text-pink-400',
+          },
+        ]
+
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {stats.map(s => (
+              <div key={s.label} className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800 flex flex-col gap-1">
+                <div className="text-gray-500 text-xs flex items-center gap-1">
+                  <span>{s.icon}</span> {s.label}
+                </div>
+                <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-gray-600 text-xs">{s.sub}</div>
               </div>
-              <div className="text-xl font-semibold">{s.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      })()}
 
       {/* How scoring works */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
