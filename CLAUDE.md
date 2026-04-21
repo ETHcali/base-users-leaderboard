@@ -147,6 +147,7 @@ score = (native_tx_count × 1) + (token_tx_count × 2) + (total_token_volume_usd
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `.env.local` + Vercel | Supabase anon key |
 | `NEXT_PUBLIC_ADMIN_PASSWORD` | `.env.local` + Vercel | Admin panel password (sessionStorage-cached) |
 | `NEXT_PUBLIC_POAP_API_KEY` | `.env.local` + Vercel | POAP API key (used server-side in /api/sync) |
+| `ETHERSCAN_API_KEY` | `.env.local` + Vercel | Etherscan API key — fallback NFT holder sync when Blockscout fails |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | `.env.local` + Vercel | WalletConnect project ID |
 
 ## Blockscout chains
