@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Design system: Cypher Terminal / Sacred Architect */
+  --color-surface:                  #131314;
+  --color-surface-dim:              #131314;
+  --color-surface-bright:           #3a393a;
+  --color-surface-container-lowest: #0e0e0f;
+  --color-surface-container-low:    #1c1b1c;
+  --color-surface-container:        #201f20;
+  --color-surface-container-high:   #2a2a2b;
+  --color-surface-container-highest:#353436;
+  --color-surface-variant:          #353436;
+  --color-background:               #131314;
+
+  --color-primary:           #c0c1ff;
+  --color-primary-container: #2e3192;
+  --color-primary-fixed:     #e1e0ff;
+  --color-primary-fixed-dim: #c0c1ff;
+  --color-on-primary:        #1e2084;
+  --color-on-primary-container: #9da1ff;
+
+  --color-secondary:           #c2c3f0;
+  --color-secondary-container: #424369;
+  --color-on-secondary:        #2b2d51;
+  --color-on-secondary-container: #b1b1dd;
+
+  --color-on-surface:         #e5e2e3;
+  --color-on-surface-variant: #c7c5d4;
+  --color-on-background:      #e5e2e3;
+  --color-outline:            #908f9d;
+  --color-outline-variant:    #464652;
+
+  --color-error:              #ffb4ab;
+  --color-error-container:    #93000a;
+
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-body:     "Space Grotesk", sans-serif;
+  --font-label:    "Space Grotesk", sans-serif;
+
+  --radius: 0px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Sacred background: radial glow + terminal grid */
+.sacred-bg {
+  background-color: #131314;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,49,146,0.18) 0%, transparent 60%),
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
 }
+
+.cyber-gradient {
+  background: linear-gradient(135deg, #2e3192 0%, #c0c1ff 100%);
+}
+
+.glow-blue {
+  box-shadow: 0 0 30px 8px rgba(46,49,146,0.2);
+}
+
+.glow-primary {
+  box-shadow: 0 0 12px rgba(192,193,255,0.35);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px rgba(192,193,255,0.5);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0e0e0f; }
+::-webkit-scrollbar-thumb { background: #2e3192; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #131314;
+  color: #e5e2e3;
+  font-family: "Space Grotesk", sans-serif;
 }

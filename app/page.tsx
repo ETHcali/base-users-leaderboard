@@ -2,7 +2,7 @@
 
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { RegisterModal } from './components/RegisterModal'
@@ -11,58 +11,16 @@ import { supabase, type UserProfile } from '@/lib/supabase'
 const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
 const TOP_N = 30
 
-type ChainKey = 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
+type ChainKey = 'all' | 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
 
-const CHAINS: { key: ChainKey; label: string; logo: string; color: string; explorer: string; queryId: string }[] = [
-  {
-    key: 'base',
-    label: 'Base',
-    logo: '/chains/base logo.svg',
-    color: 'text-blue-400',
-    explorer: 'https://basescan.org/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_BASE ?? '6634911',
-  },
-  {
-    key: 'ethereum',
-    label: 'Ethereum',
-    logo: '/chains/ethereum.png',
-    color: 'text-gray-300',
-    explorer: 'https://etherscan.io/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM ?? '',
-  },
-  {
-    key: 'optimism',
-    label: 'Optimism',
-    logo: '/chains/op mainnet.png',
-    color: 'text-red-400',
-    explorer: 'https://optimistic.etherscan.io/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM ?? '',
-  },
-  {
-    key: 'polygon',
-    label: 'Polygon',
-    logo: '/chains/polygon.png',
-    color: 'text-purple-400',
-    explorer: 'https://polygonscan.com/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON ?? '',
-  },
-  {
-    key: 'gnosis',
-    label: 'Gnosis',
-    logo: '/chains/gnosis.png',
-    color: 'text-emerald-400',
-    explorer: 'https://gnosisscan.io/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS ?? '',
-  },
-  {
-    key: 'unichain',
-    label: 'Unichain',
-    logo: '/chains/unichain.png',
-    color: 'text-pink-400',
-    explorer: 'https://uniscan.xyz/address/',
-    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '',
-  },
-]
+const CHAINS = [
+  { key: 'base',     label: 'Base',     queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_BASE     ?? '6634911', explorer: 'https://basescan.org/address/' },
+  { key: 'ethereum', label: 'Ethereum', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM ?? '',        explorer: 'https://etherscan.io/address/' },
+  { key: 'optimism', label: 'Optimism', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM ?? '',        explorer: 'https://optimistic.etherscan.io/address/' },
+  { key: 'polygon',  label: 'Polygon',  queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON  ?? '',        explorer: 'https://polygonscan.com/address/' },
+  { key: 'gnosis',   label: 'Gnosis',   queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS   ?? '',        explorer: 'https://gnosisscan.io/address/' },
+  { key: 'unichain', label: 'Unichain', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '',        explorer: 'https://uniscan.xyz/address/' },
+] as const
 
 type Row = {
   address: string
@@ -75,14 +33,6 @@ type Row = {
   last_tx_time: string | null
 }
 
-type DuneResponse = {
-  execution_ended_at: string
-  result: {
-    rows: Row[]
-    metadata: { total_row_count: number }
-  }
-}
-
 function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
@@ -92,104 +42,124 @@ function fmt(n: number) {
 }
 
 function fmtUsd(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0,
-  }).format(n)
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
-function ScoreTooltip({ row }: { row: Row }) {
-  const parts = [
-    { label: 'Native txns', pts: row.native_tx_count * 1, formula: `${fmt(row.native_tx_count)} × 1` },
-    { label: 'Token txns', pts: row.token_tx_count * 2, formula: `${fmt(row.token_tx_count)} × 2` },
-    { label: 'Volume', pts: row.total_token_volume_usd / 100, formula: `$${fmt(row.total_token_volume_usd)} ÷ 100` },
-    { label: 'Contracts', pts: row.contracts_deployed * 3, formula: `${row.contracts_deployed} × 3` },
-  ]
+function fmtScore(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return fmt(n)
+}
+
+function LogLine({ time, msg, type = 'info' }: { time: string; msg: string; type?: 'info' | 'warn' | 'ok' }) {
+  const color = type === 'warn' ? 'text-[#ffb4ab]' : type === 'ok' ? 'text-[#c0c1ff]' : 'text-[#c0c1ff]'
   return (
-    <div className="absolute z-10 right-0 top-6 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl p-3 text-xs text-left">
-      <div className="font-semibold text-white mb-2">Score breakdown</div>
-      {parts.map(p => (
-        <div key={p.label} className="flex justify-between text-gray-300 py-0.5">
-          <span>{p.label} <span className="text-gray-500">({p.formula})</span></span>
-          <span className="text-white font-mono ml-2">+{fmt(p.pts)}</span>
-        </div>
-      ))}
-      <div className="border-t border-gray-700 mt-2 pt-2 flex justify-between font-semibold text-white">
-        <span>Total</span>
-        <span>{fmt(row.activity_score)}</span>
-      </div>
+    <div className="flex gap-2 text-[#c7c5d4]">
+      <span className={`${color} shrink-0`}>[{time}]</span>
+      <span>&gt; {msg}</span>
     </div>
   )
 }
 
 export default function Home() {
   const { address, isConnected } = useAccount()
-  const [activeChain, setActiveChain] = useState<ChainKey>('base')
-  const [rowsByChain, setRowsByChain] = useState<Partial<Record<ChainKey, Row[]>>>({})
-  const [updatedByChain, setUpdatedByChain] = useState<Partial<Record<ChainKey, string>>>({})
-  const [loadingChains, setLoadingChains] = useState<Partial<Record<ChainKey, boolean>>>({ base: true })
-  const [errorByChain, setErrorByChain] = useState<Partial<Record<ChainKey, string>>>({})
-  const [search, setSearch] = useState('')
-  const [hoveredScore, setHoveredScore] = useState<string | null>(null)
+  const [activeChain, setActiveChain] = useState<ChainKey>('all')
+  const [rowsByChain, setRowsByChain] = useState<Partial<Record<string, Row[]>>>({})
+  const [loadingChains, setLoadingChains] = useState<Partial<Record<string, boolean>>>({})
+  const [logLines, setLogLines] = useState<{ time: string; msg: string; type?: 'info' | 'warn' | 'ok' }[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [showRegister, setShowRegister] = useState(false)
+  const [search, setSearch] = useState('')
+  const [visibleCount, setVisibleCount] = useState(30)
 
-  const chain = CHAINS.find(c => c.key === activeChain)!
-  const rows = rowsByChain[activeChain] ?? []
-  const loading = loadingChains[activeChain] ?? false
-  const error = errorByChain[activeChain]
-  const lastUpdated = updatedByChain[activeChain]
+  function addLog(msg: string, type: 'info' | 'warn' | 'ok' = 'info') {
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    setLogLines(prev => [...prev.slice(-20), { time, msg, type }])
+  }
 
-  async function fetchChain(key: ChainKey) {
-    const cfg = CHAINS.find(c => c.key === key)!
-    if (!cfg.queryId) return
-    if (rowsByChain[key] !== undefined) return // already loaded
-
+  async function fetchChain(key: string) {
+    const cfg = CHAINS.find(c => c.key === key)
+    if (!cfg?.queryId || rowsByChain[key] !== undefined) return
     setLoadingChains(prev => ({ ...prev, [key]: true }))
+    addLog(`Initializing ${cfg.label} data stream...`)
     try {
       const res = await fetch(
         `https://api.dune.com/api/v1/query/${cfg.queryId}/results?limit=500`,
         { headers: { 'X-Dune-API-Key': DUNE_API_KEY } }
       )
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data: DuneResponse = await res.json()
-      setRowsByChain(prev => ({ ...prev, [key]: data.result.rows ?? [] }))
-      setUpdatedByChain(prev => ({ ...prev, [key]: data.execution_ended_at ?? '' }))
-    } catch {
-      setErrorByChain(prev => ({ ...prev, [key]: 'Could not load leaderboard. Try again later.' }))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const rows: Row[] = data.result?.rows ?? []
+      setRowsByChain(prev => ({ ...prev, [key]: rows }))
+      addLog(`${cfg.label} — ${rows.length} operatives indexed`, 'ok')
+    } catch (err) {
+      addLog(`WARN: ${cfg.label} endpoint error — ${err}`, 'warn')
       setRowsByChain(prev => ({ ...prev, [key]: [] }))
     } finally {
       setLoadingChains(prev => ({ ...prev, [key]: false }))
     }
   }
 
-  useEffect(() => { fetchChain('base') }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleChainTab(key: ChainKey) {
-    setActiveChain(key)
-    setSearch('')
-    fetchChain(key)
-  }
+  // Load all chains at startup for "All Chains" aggregation
+  useEffect(() => {
+    addLog('System boot sequence initiated...')
+    addLog('Connecting to Dune Analytics relay...')
+    CHAINS.forEach(c => { if (c.queryId) fetchChain(c.key) })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!address) { setProfile(null); return }
-    supabase
-      .from('users')
-      .select('*')
-      .eq('wallet_address', address.toLowerCase())
-      .maybeSingle()
+    supabase.from('users').select('*').eq('wallet_address', address.toLowerCase()).maybeSingle()
       .then(({ data }) => setProfile(data ?? null))
   }, [address])
 
-  const userRank = address
-    ? rows.findIndex(r => r.address.toLowerCase() === address.toLowerCase()) + 1
-    : 0
-  const isTop30 = userRank > 0 && userRank <= TOP_N
-  const userRow = address ? rows.find(r => r.address.toLowerCase() === address.toLowerCase()) : null
-  const top30Score = rows[TOP_N - 1]?.activity_score ?? 0
-  const firstScore = rows[0]?.activity_score ?? 1
+  // Aggregate "All Chains" by deduplicating wallets, keeping best score per address
+  const allRows = useMemo<Row[]>(() => {
+    const map = new Map<string, Row>()
+    for (const chain of CHAINS) {
+      for (const row of rowsByChain[chain.key] ?? []) {
+        const existing = map.get(row.address)
+        if (!existing) {
+          map.set(row.address, { ...row })
+        } else {
+          // Accumulate cross-chain activity
+          map.set(row.address, {
+            ...existing,
+            native_tx_count: existing.native_tx_count + row.native_tx_count,
+            token_tx_count: existing.token_tx_count + row.token_tx_count,
+            total_token_volume_usd: existing.total_token_volume_usd + row.total_token_volume_usd,
+            contracts_deployed: existing.contracts_deployed + row.contracts_deployed,
+            activity_score: existing.activity_score + row.activity_score,
+          })
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.activity_score - a.activity_score)
+  }, [rowsByChain])
+
+  const activeRows = activeChain === 'all' ? allRows : (rowsByChain[activeChain] ?? [])
+  const isLoadingAny = CHAINS.some(c => loadingChains[c.key])
+  const isLoadingCurrent = activeChain === 'all' ? isLoadingAny : !!loadingChains[activeChain]
+
+  const activeChainCfg = CHAINS.find(c => c.key === activeChain)
+  const explorerBase = activeChainCfg?.explorer ?? 'https://basescan.org/address/'
+
   const filtered = search.trim()
-    ? rows.filter(r => r.address.toLowerCase().includes(search.trim().toLowerCase()))
-    : rows
+    ? activeRows.filter(r => r.address.toLowerCase().includes(search.trim().toLowerCase()))
+    : activeRows
+
+  const userRank = address ? activeRows.findIndex(r => r.address.toLowerCase() === address.toLowerCase()) + 1 : 0
+  const isTop30 = userRank > 0 && userRank <= TOP_N
+  const userRow = address ? activeRows.find(r => r.address.toLowerCase() === address.toLowerCase()) : null
+  const top30Score = activeRows[TOP_N - 1]?.activity_score ?? 0
+
+  const totalVolume = activeRows.reduce((s, r) => s + r.total_token_volume_usd, 0)
+  const totalContracts = activeRows.reduce((s, r) => s + r.contracts_deployed, 0)
+  const totalTxns = activeRows.reduce((s, r) => s + r.native_tx_count + r.token_tx_count, 0)
+
+  const visibleRows = filtered.slice(0, visibleCount)
 
   return (
     <>
@@ -200,298 +170,332 @@ export default function Home() {
           onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/claim' }}
         />
       )}
-      <main className="max-w-5xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+      {/* ── HEADER (desktop) ── */}
+      <header className="hidden md:flex justify-between items-center w-full px-8 py-4 sticky top-0 z-50 bg-[#131314]/90 backdrop-blur-xl border-b border-[#464652]/20"
+        style={{ boxShadow: '0 10px 40px -10px rgba(46,49,146,0.2)' }}>
+        <div className="flex items-center gap-3">
+          <Image src="/branding/Open SEA - Ethereum Cali3.png" alt="ETH Cali" width={32} height={32} />
+          <span className="font-headline text-lg font-bold tracking-widest uppercase text-[#e5e2e3]">ETH CALI</span>
+        </div>
+        <nav className="flex gap-6 font-label text-xs uppercase tracking-widest">
+          <span className="text-[#c0c1ff] flex items-center gap-1.5" style={{ textShadow: '0 0 12px rgba(192,193,255,0.6)' }}>
+            <span>◈</span> Leaderboard
+          </span>
+          <Link href="/claim" className="text-[#e5e2e3]/40 hover:text-[#c0c1ff] transition-colors flex items-center gap-1.5">
+            <span>◇</span> Claim
+          </Link>
+          <Link href="/admin/dashboard" className="text-[#e5e2e3]/40 hover:text-[#c0c1ff] transition-colors flex items-center gap-1.5">
+            <span>◇</span> Terminal
+          </Link>
+        </nav>
+        <ConnectButton />
+      </header>
+
+      {/* ── HEADER (mobile) ── */}
+      <header className="md:hidden flex justify-between items-center px-5 py-4 sticky top-0 z-50 bg-[#131314]/90 backdrop-blur-xl border-b border-[#464652]/20">
+        <div className="flex items-center gap-2">
+          <Image src="/branding/Open SEA - Ethereum Cali3.png" alt="ETH Cali" width={28} height={28} />
+          <span className="font-headline text-base font-bold tracking-widest uppercase text-[#e5e2e3]">ETH CALI</span>
+        </div>
+        <ConnectButton />
+      </header>
+
+      <main className="flex-grow w-full max-w-7xl mx-auto px-4 md:px-8 py-10 space-y-10 pb-28 md:pb-10">
+
+        {/* ── TITLE + CHAIN TABS ── */}
+        <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <span className="text-2xl">⛓️</span>
-              <h1 className="text-3xl font-bold tracking-tight">ETH Cali Leaderboard</h1>
-            </div>
-            <p className="text-gray-400 text-sm">
-              Onchain activity of users onboarded by{' '}
-              <a href="https://ethcali.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ETH Cali</a>
-              {' · '}All-time activity per chain
-              {lastUpdated && (
-                <span className="text-gray-600 ml-2">
-                  · Updated {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              )}
-            </p>
+            <p className="font-label text-xs text-[#c7c5d4]/60 uppercase tracking-[0.3em] mb-2">// verified on-chain data stream</p>
+            <h1 className="font-headline text-5xl md:text-6xl font-black tracking-tight text-[#e5e2e3] leading-none">
+              GLOBAL<br />RANKINGS
+            </h1>
           </div>
-          <ConnectButton />
-        </div>
 
-        {/* Chain tabs */}
-        <div className="flex gap-2 flex-wrap">
-          {CHAINS.map(c => {
-            const isActive = c.key === activeChain
-            const isAvailable = !!c.queryId
-            return (
-              <button
-                key={c.key}
-                onClick={() => isAvailable && handleChainTab(c.key)}
-                disabled={!isAvailable}
-                title={!isAvailable ? 'Query coming soon' : undefined}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all border ${
-                  isActive
-                    ? 'bg-gray-800 border-gray-600 text-white'
-                    : isAvailable
-                    ? 'border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
-                    : 'border-gray-900 text-gray-700 cursor-not-allowed'
-                }`}
-              >
-                <Image src={c.logo} alt={c.label} width={16} height={16} className="rounded-sm" />
-                {c.label}
-                {!isAvailable && <span className="text-xs text-gray-700">soon</span>}
-              </button>
-            )
-          })}
-        </div>
+          {/* Chain tabs */}
+          <div className="flex flex-wrap gap-1 bg-[#1c1b1c] p-1 border border-[#464652]/20">
+            {[{ key: 'all', label: 'All Chains' }, ...CHAINS].map(c => {
+              const isActive = activeChain === c.key
+              const isAvail = c.key === 'all' || !!(CHAINS.find(ch => ch.key === c.key)?.queryId)
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => { setActiveChain(c.key as ChainKey); setVisibleCount(30); setSearch('') }}
+                  disabled={!isAvail}
+                  className={`px-4 py-2 font-label text-xs uppercase tracking-widest transition-all ${
+                    isActive
+                      ? 'bg-[#2e3192] text-[#c0c1ff]'
+                      : isAvail
+                      ? 'text-[#c7c5d4]/50 hover:text-[#c0c1ff] hover:bg-[#2e3192]/20'
+                      : 'text-[#464652] cursor-not-allowed'
+                  }`}
+                  style={isActive ? { boxShadow: '0 0 20px rgba(46,49,146,0.4)' } : {}}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
 
-        {/* Wallet status banner */}
-        {isConnected && address && rows.length > 0 && (
-          <div className={`rounded-xl px-5 py-4 border text-sm ${
+        {/* ── WALLET BANNER ── */}
+        {isConnected && address && activeRows.length > 0 && (
+          <div className={`border p-5 relative overflow-hidden ${
             isTop30
-              ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
+              ? 'border-[#c0c1ff]/40 bg-[#2e3192]/10'
               : userRank > 0
-              ? 'bg-blue-950 border-blue-700 text-blue-300'
-              : 'bg-gray-900 border-gray-700 text-gray-400'
-          }`}>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-xl">{isTop30 ? '🏆' : userRank > 0 ? '📊' : '👋'}</span>
-              <div className="flex-1 flex flex-wrap items-center gap-3">
-                {isTop30 ? (
-                  <>
-                    <span>
-                      <strong>You&apos;re #{userRank} on {chain.label}!</strong> You qualify for the ETH Cali OG NFT.
-                    </span>
-                    {profile ? (
-                      <Link href="/claim" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                        🏅 Claim your NFT →
+              ? 'border-[#464652]/40 bg-[#1c1b1c]'
+              : 'border-[#464652]/20 bg-[#1c1b1c]'
+          }`} style={isTop30 ? { boxShadow: '0 0 40px rgba(46,49,146,0.2)' } : {}}>
+            {isTop30 && <div className="absolute top-0 left-0 w-full h-0.5 cyber-gradient" />}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <div className={`font-headline text-4xl font-black ${isTop30 ? 'text-[#c0c1ff] text-glow' : 'text-[#e5e2e3]/30'}`}>
+                  {userRank > 0 ? `#${String(userRank).padStart(2, '0')}` : '--'}
+                </div>
+                <div>
+                  <p className="font-label text-xs text-[#c7c5d4]/60 uppercase tracking-widest mb-1">
+                    {isTop30 ? 'Elite Operative — OG NFT Eligible' : userRank > 0 ? 'Operative Detected' : 'Identity Unverified'}
+                  </p>
+                  <p className="font-body text-sm text-[#e5e2e3]">{shortAddr(address)}</p>
+                  {userRow && (
+                    <p className="font-label text-xs text-[#c7c5d4]/60 mt-0.5">
+                      Score: <span className="text-[#c0c1ff]">{fmtScore(userRow.activity_score)}</span>
+                      {!isTop30 && userRank > 0 && <span className="ml-2">· {fmtScore(top30Score - userRow.activity_score)} pts to top 30</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {isTop30 && (
+                  profile
+                    ? <Link href="/claim" className="cyber-gradient font-label text-xs uppercase tracking-widest px-6 py-3 text-[#1e2084] font-bold transition-all hover:opacity-90" style={{ boxShadow: '0 0 20px rgba(46,49,146,0.4)' }}>
+                        Claim OG NFT →
                       </Link>
-                    ) : (
-                      <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
-                    )}
-                  </>
-                ) : userRank > 0 ? (
-                  <>
-                    <span>
-                      You&apos;re ranked <strong>#{userRank}</strong> on {chain.label} out of {rows.length} users
-                      {userRow && (
-                        <> · Score: <strong>{fmt(userRow.activity_score)}</strong>
-                        {' '}({fmt(top30Score - userRow.activity_score)} pts to top 30)</>
-                      )}
-                    </span>
-                    {profile
-                      ? <span className={`${chain.color} text-xs`}>✓ <strong>{profile.name}</strong></span>
-                      : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register profile →</button>
-                    }
-                  </>
-                ) : (
-                  <span>
-                    <strong>{shortAddr(address)}</strong> has no activity on {chain.label} yet.
-                  </span>
+                    : <button onClick={() => setShowRegister(true)} className="border border-[#c0c1ff]/40 text-[#c0c1ff] font-label text-xs uppercase tracking-widest px-6 py-3 hover:bg-[#2e3192]/20 transition-all">
+                        Register to Claim
+                      </button>
+                )}
+                {userRank > TOP_N && userRow && (
+                  <div className="hidden sm:block w-40">
+                    <div className="flex justify-between font-label text-xs text-[#c7c5d4]/50 mb-1">
+                      <span>Progress</span>
+                      <span>{Math.min(100, Math.round((userRow.activity_score / top30Score) * 100))}%</span>
+                    </div>
+                    <div className="h-0.5 bg-[#464652]/40 w-full">
+                      <div className="h-full cyber-gradient transition-all" style={{ width: `${Math.min(100, (userRow.activity_score / top30Score) * 100).toFixed(1)}%` }} />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
-            {userRank > TOP_N && userRow && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>Progress to top 30 on {chain.label}</span>
-                  <span>{fmt(userRow.activity_score)} / {fmt(top30Score)} pts</span>
-                </div>
-                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (userRow.activity_score / top30Score) * 100).toFixed(1)}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Stats grid */}
-        {!loading && rows.length > 0 && (() => {
-          const totalNative = rows.reduce((s, r) => s + r.native_tx_count, 0)
-          const totalToken = rows.reduce((s, r) => s + r.token_tx_count, 0)
-          const totalVolume = rows.reduce((s, r) => s + r.total_token_volume_usd, 0)
-          const totalContracts = rows.reduce((s, r) => s + r.contracts_deployed, 0)
-          const totalTxns = totalNative + totalToken
-          const avgScore = Math.round(rows.reduce((s, r) => s + r.activity_score, 0) / rows.length)
-          const activeBuilders = rows.filter(r => r.contracts_deployed > 0).length
-          const heavyUsers = rows.filter(r => r.native_tx_count + r.token_tx_count >= 10).length
-
-          const stats = [
-            { label: 'Tracked Wallets', value: fmt(rows.length), sub: `${fmt(activeBuilders)} deployed contracts`, icon: '👥', color: 'text-white' },
-            { label: 'Total Transactions', value: fmt(totalTxns), sub: `${fmt(heavyUsers)} power users (10+ txns)`, icon: '⚡', color: 'text-yellow-400' },
-            { label: 'Native Txns', value: fmt(totalNative), sub: `avg ${fmt(Math.round(totalNative / rows.length))} per wallet`, icon: '🔁', color: 'text-blue-400' },
-            { label: 'ERC-20 Token Txns', value: fmt(totalToken), sub: `avg ${fmt(Math.round(totalToken / rows.length))} per wallet`, icon: '🪙', color: 'text-purple-400' },
-            { label: 'ERC-20 Volume (USD)', value: fmtUsd(totalVolume), sub: `avg ${fmtUsd(Math.round(totalVolume / rows.length))} per wallet`, icon: '💸', color: 'text-emerald-400' },
-            { label: 'Contracts Deployed', value: fmt(totalContracts), sub: `${fmt(activeBuilders)} unique builders`, icon: '📜', color: 'text-orange-400' },
-            { label: 'Top Score', value: fmt(rows[0]?.activity_score ?? 0), sub: `avg score ${fmt(avgScore)}`, icon: '🏆', color: 'text-amber-400' },
-            { label: 'Top 30 Cutoff', value: fmt(rows[TOP_N - 1]?.activity_score ?? 0), sub: `${fmt(rows.length - TOP_N)} wallets outside top 30`, icon: '🎯', color: 'text-pink-400' },
-          ]
-
-          return (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {stats.map(s => (
-                <div key={s.label} className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800 flex flex-col gap-1">
-                  <div className="text-gray-500 text-xs flex items-center gap-1">
-                    <span>{s.icon}</span> {s.label}
-                  </div>
-                  <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-                  <div className="text-gray-600 text-xs">{s.sub}</div>
-                </div>
-              ))}
-            </div>
-          )
-        })()}
-
-        {/* How scoring works */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gray-300 mb-3">How scoring works</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* ── METRIC CARDS ── */}
+        {activeRows.length > 0 && (
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: '🔁', label: 'Native transaction', pts: '1 pt each', desc: 'Any native transfer' },
-              { icon: '🪙', label: 'Token transfer', pts: '2 pts each', desc: 'ERC-20 token transactions' },
-              { icon: '💵', label: 'Token volume', pts: '1 pt / $100', desc: 'USD value of tokens moved' },
-              { icon: '📜', label: 'Contract deployed', pts: '3 pts each', desc: 'Smart contracts deployed' },
-            ].map(item => (
-              <div key={item.label} className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{item.icon}</span>
-                  <span className="text-xs font-semibold text-white">{item.pts}</span>
-                </div>
-                <div className="text-xs text-gray-400">{item.label}</div>
-                <div className="text-xs text-gray-600">{item.desc}</div>
+              { label: 'Total Volume', value: fmtUsd(totalVolume), icon: '◈', accent: true },
+              { label: 'Active Operatives', value: fmt(activeRows.length), icon: '◉', accent: false },
+              { label: 'Contracts Deployed', value: fmt(totalContracts), icon: '⬡', accent: false },
+              { label: 'Total Transactions', value: fmt(totalTxns), icon: '⚡', accent: false },
+            ].map((card, i) => (
+              <div key={card.label} className={`bg-[#1c1b1c] border border-[#464652]/15 p-5 relative overflow-hidden group hover:bg-[#201f20] transition-colors ${card.accent ? 'glow-blue' : ''}`}>
+                <div className="absolute top-2 right-2 text-[#c0c1ff]/30 text-lg">{card.icon}</div>
+                <p className="font-label text-[10px] text-[#c7c5d4]/60 uppercase tracking-[0.2em] mb-3">{card.label}</p>
+                <p className={`font-headline text-2xl font-bold ${card.accent ? 'text-[#c0c1ff]' : 'text-[#e5e2e3]'}`}>{card.value}</p>
+                {card.accent && <div className="absolute bottom-0 left-0 w-full h-0.5 cyber-gradient" />}
+                <div className="absolute bottom-0 left-0 w-full h-0.5 cyber-gradient opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* ── MAIN GRID: TABLE + LOG ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* ELITE OPERATIVES TABLE */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-[#464652]/20">
+              <h2 className="font-headline text-sm text-[#c0c1ff] uppercase tracking-[0.25em]" style={{ textShadow: '0 0 12px rgba(192,193,255,0.4)' }}>
+                Elite Operatives
+              </h2>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search address..."
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); setVisibleCount(30) }}
+                  className="bg-[#1c1b1c] border-b border-[#464652]/40 px-3 py-1.5 font-label text-xs text-[#e5e2e3] placeholder-[#464652] focus:outline-none focus:border-[#c0c1ff]/60 w-44 transition-colors"
+                />
+                <span className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">
+                  {filtered.length} / {activeRows.length}
+                </span>
+              </div>
+            </div>
+
+            {isLoadingCurrent ? (
+              <div className="space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-[#1c1b1c] border border-[#464652]/10 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-20 text-center">
+                <p className="font-label text-xs text-[#464652] uppercase tracking-widest">No operatives found</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {visibleRows.map((row, i) => {
+                  const rank = activeRows.indexOf(row) + 1
+                  const isMe = address && row.address.toLowerCase() === address.toLowerCase()
+                  const inTop30 = rank <= TOP_N
+                  const winRate = activeRows[0]?.activity_score
+                    ? Math.round((row.activity_score / activeRows[0].activity_score) * 100)
+                    : 0
+                  const isAlt = i % 2 === 0
+
+                  return (
+                    <div
+                      key={row.address}
+                      className={`flex items-center justify-between p-4 transition-all group border-l-2 ${
+                        isMe
+                          ? 'bg-[#2e3192]/15 border-[#c0c1ff]'
+                          : rank === 1
+                          ? 'bg-[#1c1b1c] border-[#c0c1ff] glow-blue'
+                          : inTop30
+                          ? `${isAlt ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'} border-transparent hover:border-[#464652]/40`
+                          : `${isAlt ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'} border-transparent hover:border-[#464652]/20`
+                      } hover:bg-[#201f20]`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className={`font-headline font-black text-lg w-10 tabular-nums ${
+                          rank <= 3 ? 'text-[#c0c1ff]' : 'text-[#464652]'
+                        }`} style={rank <= 3 ? { textShadow: '0 0 8px rgba(192,193,255,0.5)' } : {}}>
+                          #{String(rank).padStart(2, '0')}
+                        </span>
+                        <div className="w-9 h-9 bg-[#2a2a2b] border border-[#464652]/20 flex items-center justify-center shrink-0">
+                          <span className="text-[#c7c5d4]/60 text-xs">◈</span>
+                        </div>
+                        <div>
+                          <a
+                            href={`${explorerBase}${row.address}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-body text-sm text-[#e5e2e3] hover:text-[#c0c1ff] transition-colors"
+                          >
+                            {shortAddr(row.address)}
+                          </a>
+                          {isMe && <span className="ml-2 font-label text-[10px] text-[#c0c1ff] uppercase tracking-widest">you</span>}
+                          <p className="font-label text-[10px] text-[#c7c5d4]/50 mt-0.5">
+                            Score: {fmtScore(row.activity_score)}
+                            {inTop30 && <span className="ml-2 text-[#c0c1ff]/60">· top 30</span>}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right hidden md:block">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Volume</p>
+                          <p className="font-body text-sm text-[#e5e2e3]">{fmtUsd(row.total_token_volume_usd)}</p>
+                        </div>
+                        <div className="text-right hidden sm:block">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Activity</p>
+                          <p className="font-body text-sm text-[#e5e2e3]">{winRate}%</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {visibleCount < filtered.length && (
+              <button
+                onClick={() => setVisibleCount(v => v + 30)}
+                className="w-full py-4 border border-[#464652]/20 text-[#c0c1ff] font-label text-xs uppercase tracking-widest hover:bg-[#2e3192]/10 transition-colors"
+              >
+                Load More Data — {filtered.length - visibleCount} remaining
+              </button>
+            )}
+          </div>
+
+          {/* SYSTEM LOG */}
+          <div className="bg-[#1c1b1c] border border-[#464652]/15 p-6 relative flex flex-col min-h-[400px]">
+            <div className="absolute top-2 right-2 text-[#c0c1ff]/20 text-base">⊡</div>
+            <h3 className="font-headline text-xs text-[#e5e2e3] uppercase tracking-[0.25em] mb-4 pb-3 border-b border-[#464652]/20">
+              System Log
+            </h3>
+            <div className="flex-grow space-y-2.5 font-label text-[11px] overflow-y-auto pr-1">
+              {logLines.map((l, i) => (
+                <LogLine key={i} time={l.time} msg={l.msg} type={l.type} />
+              ))}
+              <div className="flex gap-2 text-[#c7c5d4]/30">
+                <span className="text-[#c0c1ff]/40 shrink-0">[{new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
+                <span className="animate-pulse">_ Awaiting input...</span>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#464652]/20">
+              <div className="flex items-center gap-2 font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">
+                <span className="w-2 h-2 rounded-full bg-[#c0c1ff]" style={{ boxShadow: '0 0 6px #c0c1ff' }} />
+                {isLoadingAny ? 'Syncing chains...' : 'System Online'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── SCORE FORMULA ── */}
+        <section className="border border-[#464652]/15 bg-[#1c1b1c] p-6">
+          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-[0.25em] mb-4">// Score Protocol</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { action: 'Native Transaction', pts: '1 pt each' },
+              { action: 'Token Transfer', pts: '2 pts each' },
+              { action: '$100 Token Volume', pts: '1 pt' },
+              { action: 'Contract Deployed', pts: '3 pts each' },
+            ].map(s => (
+              <div key={s.action} className="flex flex-col gap-1">
+                <p className="font-headline text-lg font-bold text-[#c0c1ff]">{s.pts}</p>
+                <p className="font-label text-[10px] text-[#c7c5d4]/50 uppercase tracking-widest">{s.action}</p>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-600 mt-3 border-t border-gray-800 pt-3">
-            Timeframe: all-time · Chain: <span className={chain.color}>{chain.label}</span> · Data source: Dune Analytics
+          <p className="font-label text-[10px] text-[#464652] uppercase tracking-widest mt-4 pt-4 border-t border-[#464652]/20">
+            Data: Dune Analytics · All-time · {activeChain === 'all' ? 'All EVM chains aggregated' : `Chain: ${CHAINS.find(c => c.key === activeChain)?.label ?? activeChain}`}
           </p>
-        </div>
+        </section>
 
-        {/* Search */}
-        <div className="flex gap-3 items-center">
-          <input
-            type="text"
-            placeholder={`Search by wallet address on ${chain.label}…`}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-xs text-gray-500 hover:text-gray-300">Clear</button>
-          )}
-          <span className="text-xs text-gray-600 whitespace-nowrap">{filtered.length} / {rows.length} users</span>
-        </div>
-
-        {/* Leaderboard table */}
-        {loading ? (
-          <div className="text-center text-gray-500 py-20">Loading {chain.label} leaderboard…</div>
-        ) : error ? (
-          <div className="text-center text-red-400 py-20">{error}</div>
-        ) : !chain.queryId ? (
-          <div className="text-center text-gray-600 py-20">
-            <div className="text-4xl mb-3">🔜</div>
-            <div className="text-gray-500 font-medium">{chain.label} query coming soon</div>
-            <div className="text-gray-700 text-sm mt-1">The Dune query for this chain is being set up</div>
+        {/* ── FOOTER ── */}
+        <footer className="flex flex-col sm:flex-row justify-between items-center gap-4 font-label text-[10px] text-[#464652] uppercase tracking-widest pt-4 border-t border-[#464652]/15">
+          <div className="flex gap-6">
+            <a href="https://ethcali.org" target="_blank" rel="noopener noreferrer" className="hover:text-[#c0c1ff] transition-colors">ETH Cali</a>
+            <a href="https://dune.com/ethcali" target="_blank" rel="noopener noreferrer" className="hover:text-[#c0c1ff] transition-colors">Dune Analytics</a>
+            <a href="https://warpcast.com/ethereumcali.eth" target="_blank" rel="noopener noreferrer" className="hover:text-[#c0c1ff] transition-colors">Farcaster</a>
+            <a href="https://twitter.com/ethcali_org" target="_blank" rel="noopener noreferrer" className="hover:text-[#c0c1ff] transition-colors">Twitter</a>
           </div>
-        ) : rows.length === 0 ? (
-          <div className="text-center text-gray-600 py-20">No activity found on {chain.label}</div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-800">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-400 text-xs uppercase tracking-wide border-b border-gray-800 bg-gray-900">
-                  <th className="px-4 py-3 text-left w-10">#</th>
-                  <th className="px-4 py-3 text-left">Address</th>
-                  <th className="px-4 py-3 text-right">Score ↓</th>
-                  <th className="px-4 py-3 text-right hidden sm:table-cell">Native Txns</th>
-                  <th className="px-4 py-3 text-right hidden sm:table-cell">Token Txns</th>
-                  <th className="px-4 py-3 text-right hidden md:table-cell">Volume (USD)</th>
-                  <th className="px-4 py-3 text-right hidden md:table-cell">Contracts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => {
-                  const i = rows.indexOf(row)
-                  const isMe = address && row.address.toLowerCase() === address.toLowerCase()
-                  const inTop30 = i < TOP_N
-                  const pctOfFirst = (row.activity_score / firstScore) * 100
-
-                  return (
-                    <tr
-                      key={row.address}
-                      className={`border-b border-gray-800 last:border-0 transition-colors ${
-                        isMe ? 'bg-blue-950/60' : inTop30 ? 'bg-gray-900/60' : 'hover:bg-gray-900/40'
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">
-                        <a
-                          href={`${chain.explorer}${row.address}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`${chain.color} hover:opacity-80`}
-                        >
-                          {shortAddr(row.address)}
-                        </a>
-                        {isMe && <span className="ml-2 text-blue-400 text-xs">(you)</span>}
-                        {inTop30 && <span className="ml-2 text-xs text-emerald-600">top 30</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <div
-                            className="relative cursor-help"
-                            onMouseEnter={() => setHoveredScore(row.address)}
-                            onMouseLeave={() => setHoveredScore(null)}
-                          >
-                            <span className="font-semibold">{fmt(row.activity_score)}</span>
-                            {hoveredScore === row.address && <ScoreTooltip row={row} />}
-                          </div>
-                          <div className="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-600 rounded-full"
-                              style={{ width: `${pctOfFirst.toFixed(1)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.native_tx_count)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.token_tx_count)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{fmtUsd(row.total_token_volume_usd)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{row.contracts_deployed}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <footer className="text-center text-gray-600 text-xs pt-2 flex flex-col gap-1">
-          <div>
-            Built by{' '}
-            <a href="https://ethcali.org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">ETH Cali</a>
-            {' · '}Data via{' '}
-            <a href="https://dune.com/ethcali" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Dune Analytics</a>
-            {' · '}
-            <a href="https://warpcast.com/ethereumcali.eth" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Farcaster</a>
-            {' · '}
-            <a href="https://twitter.com/ethcali_org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Twitter</a>
-          </div>
-          {lastUpdated && (
-            <div className="text-gray-700">Last data refresh: {new Date(lastUpdated).toUTCString()}</div>
-          )}
+          <span>Node: Verified · Protocol: v2.0</span>
         </footer>
       </main>
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex h-20 bg-[#0e0e0f]/95 backdrop-blur-xl border-t border-[#c0c1ff]/10"
+        style={{ boxShadow: '0 -10px 40px rgba(46,49,146,0.15)' }}>
+        <Link href="/" className="flex-1 flex flex-col items-center justify-center gap-1 bg-gradient-to-b from-[#2e3192]/60 to-transparent text-[#c0c1ff]">
+          <span className="text-lg">◈</span>
+          <span className="font-label text-[9px] uppercase tracking-widest">Leaderboard</span>
+        </Link>
+        <Link href="/claim" className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30 hover:text-[#c0c1ff] transition-colors">
+          <span className="text-lg">◇</span>
+          <span className="font-label text-[9px] uppercase tracking-widest">Claim</span>
+        </Link>
+        <Link href="/admin/dashboard" className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30 hover:text-[#c0c1ff] transition-colors">
+          <span className="text-lg">⊡</span>
+          <span className="font-label text-[9px] uppercase tracking-widest">Terminal</span>
+        </Link>
+        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30">
+          <ConnectButton />
+        </div>
+      </nav>
     </>
   )
 }
