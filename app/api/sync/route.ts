@@ -132,14 +132,6 @@ async function fetchNftHoldersEtherscan(address: string, chain: string, name: st
 }
 
 async function fetchNftHolders(address: string, chain: string, name: string) {
-  // Try Blockscout first; fall back to Etherscan if it fails or returns nothing
-  try {
-    const result = await fetchNftHoldersBlockscout(address, chain, name)
-    if (result.count > 0) return result
-    console.log(`Blockscout returned 0 for ${chain}:${name}, trying Etherscan…`)
-  } catch (err) {
-    console.log(`Blockscout failed for ${chain}:${name} (${err}), trying Etherscan…`)
-  }
   return fetchNftHoldersEtherscan(address, chain, name)
 }
 
