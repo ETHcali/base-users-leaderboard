@@ -33,19 +33,19 @@ type FilterChain = 'all' | string
 
 function ChainBadge({ chain }: { chain: string }) {
   const meta = CHAINS[chain]
-  if (!meta) return <span className="text-gray-500 text-xs">{chain}</span>
+  if (!meta) return <span className="text-[#908f9d] text-xs font-[family-name:var(--font-body)]">{chain}</span>
   return (
     <span className="flex items-center gap-1.5">
-      <img src={meta.logo} alt={meta.label} className="w-4 h-4 rounded-full object-cover" />
-      <span className="text-gray-300 text-xs">{meta.label}</span>
+      <img src={meta.logo} alt={meta.label} className="w-4 h-4 object-contain" />
+      <span className="text-[#e5e2e3] text-xs font-[family-name:var(--font-body)]">{meta.label}</span>
     </span>
   )
 }
 
 function TypeBadge({ kind }: { kind: 'poap' | 'nft' }) {
   return kind === 'poap'
-    ? <span className="bg-blue-900/60 text-blue-300 border border-blue-700/40 text-xs font-medium px-2 py-0.5 rounded-full">POAP</span>
-    : <span className="bg-purple-900/60 text-purple-300 border border-purple-700/40 text-xs font-medium px-2 py-0.5 rounded-full">NFT</span>
+    ? <span className="border border-[#c0c1ff]/20 text-[#c0c1ff] text-[9px] font-[family-name:var(--font-body)] font-bold px-2 py-0.5 uppercase tracking-widest">POAP</span>
+    : <span className="border border-[#908f9d]/30 text-[#908f9d] text-[9px] font-[family-name:var(--font-body)] font-bold px-2 py-0.5 uppercase tracking-widest">NFT</span>
 }
 
 export default function SourcesPage() {
@@ -207,122 +207,114 @@ export default function SourcesPage() {
   const poapsInFiltered = filtered.filter(r => r.kind === 'poap').length
   const nftsInFiltered  = filtered.filter(r => r.kind === 'nft').length
 
+  const inputCls = 'bg-transparent border-b border-[#464652]/40 focus:border-[#c0c1ff]/60 text-[#e5e2e3] font-[family-name:var(--font-body)] text-sm py-2 px-0 placeholder-[#464652] focus:outline-none transition-colors w-full'
+  const selectCls = 'bg-[#1c1b1c] border border-[#464652]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-2 px-2 focus:outline-none focus:border-[#c0c1ff]/60'
+
   return (
-    <div className="p-8 flex flex-col gap-6 max-w-5xl">
+    <div className="p-8 flex flex-col gap-8 max-w-5xl">
 
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
+      <div className="flex items-end justify-between flex-wrap gap-6">
         <div>
-          <h1 className="text-2xl font-bold">Sources</h1>
-          <p className="text-gray-400 text-sm mt-1">POAPs and NFTs that build the wallet dataset</p>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#c0c1ff] uppercase tracking-[0.3em] mb-2">// event_sources</p>
+          <h1 className="font-[family-name:var(--font-headline)] text-4xl font-extrabold text-[#e5e2e3] uppercase tracking-tight">
+            Sources
+          </h1>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#464652] uppercase tracking-wider mt-2">
+            POAPs and NFTs that build the wallet dataset
+            {datasetCount !== null && <span className="ml-3 text-[#c0c1ff]">· {datasetCount.toLocaleString()} addresses</span>}
+          </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs flex items-center gap-2">
-            <span className="text-gray-500">Dataset</span>
-            <span className="font-bold text-emerald-400">{datasetCount ?? '…'} addresses</span>
-          </div>
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => setPanel(panel === 'poap' ? 'none' : 'poap')}
-            className={`flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2 transition-colors ${panel === 'poap' ? 'bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+            className={`font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-4 py-2.5 border transition-colors ${panel === 'poap' ? 'border-[#c0c1ff]/40 bg-[#2e3192]/20 text-[#c0c1ff]' : 'border-[#464652]/40 text-[#908f9d] hover:text-[#c0c1ff] hover:border-[#c0c1ff]/20'}`}>
             + Add POAP
           </button>
           <button onClick={() => setPanel(panel === 'nft' ? 'none' : 'nft')}
-            className={`flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2 transition-colors ${panel === 'nft' ? 'bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}>
+            className={`font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-4 py-2.5 border transition-colors ${panel === 'nft' ? 'border-[#c0c1ff]/40 bg-[#2e3192]/20 text-[#c0c1ff]' : 'border-[#464652]/40 text-[#908f9d] hover:text-[#c0c1ff] hover:border-[#c0c1ff]/20'}`}>
             + Add NFT
           </button>
           <button onClick={runSync} disabled={syncing || unified.length === 0}
-            className="flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors">
-            {syncing ? <><span className="animate-spin inline-block">⟳</span> Syncing…</> : '🔄 Sync'}
+            className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-widest px-5 py-2.5 hover:shadow-[0_0_20px_rgba(46,49,146,0.5)] transition-all flex items-center gap-2">
+            <span className={syncing ? 'animate-spin inline-block' : ''}>⟳</span>
+            {syncing ? 'Syncing…' : 'Sync All'}
           </button>
         </div>
       </div>
 
       {/* Add POAP panel */}
       {panel === 'poap' && (
-        <div className="bg-blue-950/40 border border-blue-800/50 rounded-2xl p-5">
-          <h3 className="font-semibold text-blue-200 mb-4">Add POAP Event</h3>
-          <form onSubmit={addPoap} className="flex gap-3 flex-wrap items-end">
-            <div>
-              <label className="text-xs text-blue-400 mb-1 block">Event ID *</label>
-              <input type="number" value={newPoapId} onChange={e => setNewPoapId(e.target.value)}
-                placeholder="e.g. 147806" autoFocus
-                className="w-36 bg-gray-900 border border-blue-700/50 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+        <div className="bg-[#1c1b1c] border border-[#c0c1ff]/20 p-6" style={{ boxShadow: '0 0 20px rgba(46,49,146,0.1)' }}>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#c0c1ff] uppercase tracking-widest mb-5">Add POAP Event</p>
+          <form onSubmit={addPoap} className="flex gap-6 flex-wrap items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Event ID *</label>
+              <input type="number" value={newPoapId} onChange={e => setNewPoapId(e.target.value)} placeholder="e.g. 147806" autoFocus className={`${inputCls} w-32`} />
             </div>
-            <div>
-              <label className="text-xs text-blue-400 mb-1 block">Chain</label>
-              <select value={newPoapChain} onChange={e => setNewPoapChain(e.target.value)}
-                className="bg-gray-900 border border-blue-700/50 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Chain</label>
+              <select value={newPoapChain} onChange={e => setNewPoapChain(e.target.value)} className={selectCls}>
                 {CHAIN_OPTIONS.map(c => <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>)}
               </select>
             </div>
-            <div className="flex-1 min-w-52">
-              <label className="text-xs text-blue-400 mb-1 block">Event name *</label>
-              <input value={newPoapName} onChange={e => setNewPoapName(e.target.value)} placeholder="ETH Cali Workshop 2025"
-                className="w-full bg-gray-900 border border-blue-700/50 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+            <div className="flex flex-col gap-1 flex-1 min-w-52">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Event name *</label>
+              <input value={newPoapName} onChange={e => setNewPoapName(e.target.value)} placeholder="ETH Cali Workshop 2025" className={inputCls} />
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={addingPoap}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-4 py-2 transition-colors">
-                {addingPoap ? 'Adding…' : 'Add'}
+              <button type="submit" disabled={addingPoap} className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-widest px-5 py-2.5 transition-all">
+                {addingPoap ? '…' : 'Add'}
               </button>
-              <button type="button" onClick={() => setPanel('none')} className="text-gray-500 hover:text-gray-300 text-sm px-3 py-2">Cancel</button>
+              <button type="button" onClick={() => setPanel('none')} className="font-[family-name:var(--font-body)] text-xs text-[#464652] hover:text-[#908f9d] px-3 py-2 uppercase tracking-widest transition-colors">Cancel</button>
             </div>
           </form>
-          {poapError && <p className="text-red-400 text-xs mt-2">{poapError}</p>}
+          {poapError && <p className="font-[family-name:var(--font-body)] text-[11px] text-[#ffb4ab] mt-3 uppercase tracking-wider">✕ {poapError}</p>}
         </div>
       )}
 
       {/* Add NFT panel */}
       {panel === 'nft' && (
-        <div className="bg-purple-950/40 border border-purple-800/50 rounded-2xl p-5">
-          <h3 className="font-semibold text-purple-200 mb-4">Add NFT Contract</h3>
-          <form onSubmit={addNft} className="flex gap-3 flex-wrap items-end">
-            <div className="flex-1 min-w-64">
-              <label className="text-xs text-purple-400 mb-1 block">Contract address *</label>
-              <input value={newNftAddr} onChange={e => setNewNftAddr(e.target.value)} placeholder="0x..." autoFocus
-                className="w-full bg-gray-900 border border-purple-700/50 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 font-mono focus:outline-none focus:border-purple-500" />
+        <div className="bg-[#1c1b1c] border border-[#908f9d]/20 p-6">
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#908f9d] uppercase tracking-widest mb-5">Add NFT Contract</p>
+          <form onSubmit={addNft} className="flex gap-6 flex-wrap items-end">
+            <div className="flex flex-col gap-1 flex-1 min-w-64">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Contract address *</label>
+              <input value={newNftAddr} onChange={e => setNewNftAddr(e.target.value)} placeholder="0x..." autoFocus className={`${inputCls} font-mono`} />
             </div>
-            <div>
-              <label className="text-xs text-purple-400 mb-1 block">Chain *</label>
-              <select value={newNftChain} onChange={e => setNewNftChain(e.target.value)}
-                className="bg-gray-900 border border-purple-700/50 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
-                {CHAIN_OPTIONS.map(c => (
-                  <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>
-                ))}
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Chain *</label>
+              <select value={newNftChain} onChange={e => setNewNftChain(e.target.value)} className={selectCls}>
+                {CHAIN_OPTIONS.map(c => <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>)}
               </select>
             </div>
-            <div className="flex-1 min-w-40">
-              <label className="text-xs text-purple-400 mb-1 block">Name *</label>
-              <input value={newNftName} onChange={e => setNewNftName(e.target.value)} placeholder="Event name"
-                className="w-full bg-gray-900 border border-purple-700/50 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500" />
+            <div className="flex flex-col gap-1 flex-1 min-w-40">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Name *</label>
+              <input value={newNftName} onChange={e => setNewNftName(e.target.value)} placeholder="Event name" className={inputCls} />
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={addingNft}
-                className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-4 py-2 transition-colors">
-                {addingNft ? 'Adding…' : 'Add'}
+              <button type="submit" disabled={addingNft} className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-widest px-5 py-2.5 transition-all">
+                {addingNft ? '…' : 'Add'}
               </button>
-              <button type="button" onClick={() => setPanel('none')} className="text-gray-500 hover:text-gray-300 text-sm px-3 py-2">Cancel</button>
+              <button type="button" onClick={() => setPanel('none')} className="font-[family-name:var(--font-body)] text-xs text-[#464652] hover:text-[#908f9d] px-3 py-2 uppercase tracking-widest transition-colors">Cancel</button>
             </div>
           </form>
-          {nftError && <p className="text-red-400 text-xs mt-2">{nftError}</p>}
+          {nftError && <p className="font-[family-name:var(--font-body)] text-[11px] text-[#ffb4ab] mt-3 uppercase tracking-wider">✕ {nftError}</p>}
         </div>
       )}
 
       {/* Sync result */}
       {(syncError || syncResult) && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3">
-          {syncError && <p className="text-red-400 text-sm">{syncError}</p>}
+        <div className={`border p-4 font-[family-name:var(--font-body)] text-xs flex flex-col gap-3 ${syncError ? 'border-[#ffb4ab]/20 bg-[#93000a]/10 text-[#ffb4ab]' : 'border-[#c0c1ff]/20 bg-[#2e3192]/10 text-[#c0c1ff]'}`}>
+          {syncError && <p>{syncError}</p>}
           {syncResult && (
             <>
-              <div className="flex items-center gap-4">
-                <span className="text-emerald-400 font-bold">{syncResult.total.toLocaleString()} unique addresses collected</span>
-                <span className="text-gray-500 text-xs">in {(syncResult.durationMs / 1000).toFixed(1)}s</span>
-              </div>
-              <div className="grid grid-cols-1 gap-0.5 max-h-48 overflow-y-auto text-xs">
+              <p className="font-bold uppercase tracking-wider">✓ {syncResult.total.toLocaleString()} unique addresses · {(syncResult.durationMs / 1000).toFixed(1)}s</p>
+              <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
                 {syncResult.bySource.map((s, i) => (
-                  <div key={i} className="flex justify-between gap-4 py-0.5">
-                    <span className={s.error ? 'text-red-400' : 'text-gray-400'}>{s.source}</span>
-                    <span className={s.error ? 'text-red-400' : 'text-white font-mono'}>
-                      {s.error ? `⚠ ${s.error.slice(0, 60)}` : `${s.count} addresses`}
+                  <div key={i} className="flex justify-between gap-4 text-[10px]">
+                    <span className={s.error ? 'text-[#ffb4ab]' : 'text-[#908f9d]'}>{s.source}</span>
+                    <span className={s.error ? 'text-[#ffb4ab]' : 'text-[#e5e2e3] font-mono'}>
+                      {s.error ? `✕ ${s.error.slice(0, 60)}` : `${s.count} addrs`}
                     </span>
                   </div>
                 ))}
@@ -332,78 +324,62 @@ export default function SourcesPage() {
         </div>
       )}
 
-      {/* Stats summary */}
-      <div className="flex gap-3 flex-wrap">
+      {/* Stats + filters */}
+      <div className="flex gap-4 flex-wrap items-center">
         {[
-          { label: `${poaps.length} POAPs`, color: 'text-blue-400', bg: 'bg-blue-900/20 border-blue-800/40' },
-          { label: `${nfts.length} NFTs`, color: 'text-purple-400', bg: 'bg-purple-900/20 border-purple-800/40' },
-          { label: `${unified.length} total sources`, color: 'text-white', bg: 'bg-gray-900 border-gray-800' },
+          { label: `${poaps.length} POAPs`, active: typeFilter === 'poap', onClick: () => setTypeFilter(typeFilter === 'poap' ? 'all' : 'poap') },
+          { label: `${nfts.length} NFTs`, active: typeFilter === 'nft', onClick: () => setTypeFilter(typeFilter === 'nft' ? 'all' : 'nft') },
+          { label: `${unified.length} total`, active: typeFilter === 'all', onClick: () => setTypeFilter('all') },
         ].map(s => (
-          <div key={s.label} className={`border rounded-xl px-4 py-2 text-sm font-semibold ${s.bg} ${s.color}`}>
+          <button key={s.label} onClick={s.onClick}
+            className={`font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-3 py-1.5 border transition-colors ${s.active ? 'border-[#c0c1ff]/40 text-[#c0c1ff] bg-[#2e3192]/10' : 'border-[#464652]/30 text-[#908f9d] hover:text-[#c0c1ff]'}`}>
             {s.label}
-          </div>
-        ))}
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <span className="text-gray-500 text-xs mr-1">Type:</span>
-        {(['all', 'poap', 'nft'] as FilterType[]).map(t => (
-          <button key={t} onClick={() => setTypeFilter(t)}
-            className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${typeFilter === t ? 'bg-gray-700 border-gray-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}>
-            {t === 'all' ? 'All types' : t.toUpperCase()}
           </button>
         ))}
-        <span className="text-gray-700 mx-1">|</span>
-        <span className="text-gray-500 text-xs mr-1">Chain:</span>
+        <div className="h-4 w-px bg-[#464652]/30" />
         <button onClick={() => setChainFilter('all')}
-          className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${chainFilter === 'all' ? 'bg-gray-700 border-gray-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}>
+          className={`font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-3 py-1.5 border transition-colors ${chainFilter === 'all' ? 'border-[#c0c1ff]/40 text-[#c0c1ff] bg-[#2e3192]/10' : 'border-[#464652]/30 text-[#908f9d] hover:text-[#c0c1ff]'}`}>
           All chains
         </button>
         {activeChains.map(c => {
           const meta = CHAINS[c]
           return (
             <button key={c} onClick={() => setChainFilter(chainFilter === c ? 'all' : c)}
-              className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border transition-colors ${chainFilter === c ? 'bg-gray-700 border-gray-500 text-white' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}>
-              {meta && <img src={meta.logo} alt={meta.label} className="w-3.5 h-3.5 rounded-full object-cover" />}
+              className={`flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-3 py-1.5 border transition-colors ${chainFilter === c ? 'border-[#c0c1ff]/40 text-[#c0c1ff] bg-[#2e3192]/10' : 'border-[#464652]/30 text-[#908f9d] hover:text-[#c0c1ff]'}`}>
+              {meta && <img src={meta.logo} alt={meta.label} className="w-3.5 h-3.5 object-contain" />}
               {meta?.label ?? c}
             </button>
           )
         })}
-        <span className="text-gray-600 text-xs ml-auto">{filtered.length} shown · {poapsInFiltered} POAPs, {nftsInFiltered} NFTs</span>
+        <span className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-widest ml-auto">
+          {filtered.length} shown · {poapsInFiltered} POAPs · {nftsInFiltered} NFTs
+        </span>
       </div>
 
       {/* Unified table */}
-      <div className="rounded-xl border border-gray-800 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="border border-[#464652]/15 overflow-hidden">
+        <table className="w-full text-xs">
           <thead>
-            <tr className="text-gray-400 text-xs uppercase tracking-wide border-b border-gray-800 bg-gray-900 text-left">
-              <th className="px-4 py-3">Chain</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">ID / Address</th>
-              <th className="px-4 py-3 text-right">Holders</th>
-              <th className="px-4 py-3 text-right">Last sync</th>
-              <th className="px-4 py-3" />
+            <tr className="bg-[#0e0e0f] border-b border-[#464652]/20 text-left">
+              {['Chain', 'Type', 'Name', 'ID / Address', 'Holders', 'Last sync', ''].map(h => (
+                <th key={h} className={`px-4 py-3 font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-widest ${h === 'Holders' || h === 'Last sync' ? 'text-right' : ''}`}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loadingData ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i} className="border-b border-gray-800">
-                  <td colSpan={6} className="px-4 py-3">
-                    <div className="h-4 bg-gray-800 rounded animate-pulse w-full" />
+                <tr key={i} className="border-b border-[#464652]/10">
+                  <td colSpan={7} className="px-4 py-3">
+                    <div className="h-4 bg-[#201f20] animate-pulse w-full" />
                   </td>
                 </tr>
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center text-gray-600 py-16">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-3xl">🔍</span>
-                    <span>No sources match this filter.</span>
-                    <button onClick={() => { setTypeFilter('all'); setChainFilter('all') }} className="text-blue-400 text-xs hover:underline">Clear filters</button>
-                  </div>
+                <td colSpan={7} className="text-center py-16 font-[family-name:var(--font-body)] text-[#464652] text-xs uppercase tracking-widest">
+                  No sources match this filter.{' '}
+                  <button onClick={() => { setTypeFilter('all'); setChainFilter('all') }} className="text-[#c0c1ff] hover:underline">Clear</button>
                 </td>
               </tr>
             ) : filtered.map(row => {
@@ -413,48 +389,31 @@ export default function SourcesPage() {
 
               if (isEditing) {
                 return (
-                  <tr key={key} className="border-b border-gray-800 bg-gray-900/80">
-                    {/* Chain selector */}
+                  <tr key={key} className="border-b border-[#464652]/10 bg-[#201f20]">
                     <td className="px-3 py-2">
-                      <select
-                        value={editState.chain}
-                        onChange={e => setEditState(s => ({ ...s, chain: e.target.value }))}
-                        className="bg-gray-800 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 w-28"
-                      >
-                        {CHAIN_OPTIONS.map(c => (
-                          <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>
-                        ))}
+                      <select value={editState.chain} onChange={e => setEditState(s => ({ ...s, chain: e.target.value }))} className={`${selectCls} w-28`}>
+                        {CHAIN_OPTIONS.map(c => <option key={c} value={c}>{CHAINS[c]?.label ?? c}</option>)}
                       </select>
                     </td>
-                    {/* Type — not editable */}
                     <td className="px-3 py-2"><TypeBadge kind={row.kind} /></td>
-                    {/* Name input */}
                     <td className="px-3 py-2" colSpan={2}>
                       <input
                         value={editState.name}
                         onChange={e => setEditState(s => ({ ...s, name: e.target.value }))}
                         onKeyDown={e => { if (e.key === 'Enter') saveEdit(row); if (e.key === 'Escape') setEditingRow(null) }}
                         autoFocus
-                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                        className="w-full bg-transparent border-b border-[#c0c1ff]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-1 px-0 focus:outline-none"
                       />
                     </td>
-                    {/* Holders + last sync — read-only in edit */}
-                    <td className="px-3 py-2 text-right text-gray-600 text-xs">{row.holder_count > 0 ? row.holder_count.toLocaleString() : '—'}</td>
+                    <td className="px-3 py-2 text-right text-[#464652]">{row.holder_count > 0 ? row.holder_count.toLocaleString() : '—'}</td>
                     <td className="px-3 py-2" />
-                    {/* Save / Cancel */}
                     <td className="px-3 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => saveEdit(row)}
-                          disabled={saving || !editState.name.trim()}
-                          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                        >
+                        <button onClick={() => saveEdit(row)} disabled={saving || !editState.name.trim()}
+                          className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-bold text-[9px] uppercase tracking-widest px-3 py-1.5">
                           {saving ? '…' : 'Save'}
                         </button>
-                        <button
-                          onClick={() => setEditingRow(null)}
-                          className="text-gray-500 hover:text-gray-300 text-xs px-2 py-1.5 rounded-lg transition-colors"
-                        >
+                        <button onClick={() => setEditingRow(null)} className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] hover:text-[#908f9d] px-2 py-1.5 uppercase tracking-widest transition-colors">
                           Cancel
                         </button>
                       </div>
@@ -464,42 +423,38 @@ export default function SourcesPage() {
               }
 
               return (
-                <tr key={key} className="border-b border-gray-800 last:border-0 hover:bg-gray-900/50 transition-colors group">
+                <tr key={key} className={`border-b border-[#464652]/10 last:border-0 hover:bg-[#201f20] transition-colors group ${row.kind === 'poap' ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'}`}>
                   <td className="px-4 py-3"><ChainBadge chain={row.chain} /></td>
                   <td className="px-4 py-3"><TypeBadge kind={row.kind} /></td>
-                  <td className="px-4 py-3 text-white font-medium max-w-xs truncate" title={row.name}>{row.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs">
+                  <td className="px-4 py-3 text-[#e5e2e3] font-[family-name:var(--font-body)] max-w-xs truncate" title={row.name}>{row.name}</td>
+                  <td className="px-4 py-3 font-mono">
                     {row.kind === 'poap' ? (
-                      <a href={`https://poap.gallery/drops/${row.event_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                      <a href={`https://poap.gallery/drops/${row.event_id}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">
                         #{row.event_id}
                       </a>
                     ) : (
-                      <a href={`https://${row.chain === 'ethereum' ? 'eth' : row.chain}.blockscout.com/address/${row.address}`} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">
+                      <a href={`https://${row.chain === 'ethereum' ? 'eth' : row.chain}.blockscout.com/address/${row.address}`} target="_blank" rel="noopener noreferrer" className="text-[#908f9d] hover:text-[#c0c1ff] transition-colors">
                         {row.address.slice(0, 8)}…{row.address.slice(-6)}
                       </a>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {row.holder_count > 0
-                      ? <span className="text-white font-semibold text-sm">{row.holder_count.toLocaleString()}</span>
-                      : <span className="text-gray-600 text-xs">—</span>}
+                      ? <span className="font-[family-name:var(--font-headline)] text-sm font-bold text-[#e5e2e3]">{row.holder_count.toLocaleString()}</span>
+                      : <span className="text-[#464652]">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 text-right text-[#908f9d] whitespace-nowrap">
                     {row.last_synced_at
                       ? new Date(row.last_synced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : <span className="text-gray-700">never</span>}
+                      : <span className="text-[#464652]">never</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => startEdit(row)} className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded-lg hover:bg-gray-700 transition-colors" title="Edit">
-                        ✏️
+                      <button onClick={() => startEdit(row)} className="text-[#908f9d] hover:text-[#c0c1ff] text-xs px-2 py-1 transition-colors" title="Edit">✏</button>
+                      <button onClick={() => syncOne(row)} disabled={isSyncing || syncing} className="text-[#908f9d] hover:text-[#c0c1ff] disabled:opacity-40 text-xs px-2 py-1 transition-colors" title="Sync">
+                        <span className={isSyncing ? 'animate-spin inline-block' : ''}>⟳</span>
                       </button>
-                      <button onClick={() => syncOne(row)} disabled={isSyncing || syncing} className="text-emerald-600 hover:text-emerald-400 disabled:opacity-40 text-xs px-2 py-1 rounded-lg hover:bg-emerald-900/20 transition-colors" title="Sync">
-                        {isSyncing ? <span className="animate-spin inline-block">⟳</span> : '⟳'}
-                      </button>
-                      <button onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)} className="text-gray-600 hover:text-red-400 text-xs px-2 py-1 rounded-lg hover:bg-red-900/20 transition-colors" title="Remove">
-                        ✕
-                      </button>
+                      <button onClick={() => row.kind === 'poap' ? deletePoap(row.id) : deleteNft(row.id)} className="text-[#464652] hover:text-[#ffb4ab] text-xs px-2 py-1 transition-colors" title="Remove">✕</button>
                     </div>
                   </td>
                 </tr>

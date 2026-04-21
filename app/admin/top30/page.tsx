@@ -33,9 +33,9 @@ function fmtUsd(n: number) {
 }
 
 const STATUS_META: Record<Status, { label: string; color: string; dot: string }> = {
-  'registered':  { label: 'Registered',  color: 'text-emerald-400', dot: 'bg-emerald-400' },
-  'in-dataset':  { label: 'In dataset',  color: 'text-blue-400',    dot: 'bg-blue-400' },
-  'unknown':     { label: 'Unknown',     color: 'text-gray-500',    dot: 'bg-gray-600' },
+  'registered':  { label: 'Registered',  color: 'text-[#c0c1ff]',  dot: 'bg-[#c0c1ff]' },
+  'in-dataset':  { label: 'In dataset',  color: 'text-[#908f9d]',  dot: 'bg-[#908f9d]' },
+  'unknown':     { label: 'Unknown',     color: 'text-[#464652]',  dot: 'bg-[#464652]' },
 }
 
 function exportCsv(rows: Top30Row[]) {
@@ -97,105 +97,96 @@ export default function Top30Page() {
   }
 
   return (
-    <div className="p-8 flex flex-col gap-6 max-w-5xl">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="p-8 flex flex-col gap-8 max-w-5xl">
+
+      {/* Header */}
+      <div className="flex items-end justify-between flex-wrap gap-6">
         <div>
-          <h1 className="text-2xl font-bold">Top 30 — OG NFT Eligibility</h1>
-          <p className="text-gray-400 text-sm mt-1">Reconcile Dune leaderboard with registered users and dataset</p>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#c0c1ff] uppercase tracking-[0.3em] mb-2">// og_nft_eligibility</p>
+          <h1 className="font-[family-name:var(--font-headline)] text-4xl font-extrabold text-[#e5e2e3] uppercase tracking-tight">Top 30</h1>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#464652] uppercase tracking-wider mt-2">
+            Dune leaderboard × registered users × dataset
+          </p>
         </div>
-        <button
-          onClick={() => exportCsv(rows)}
-          className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-xl px-4 py-2 transition-colors"
-        >
+        <button onClick={() => exportCsv(rows)}
+          className="cyber-gradient text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-[0.2em] px-6 py-3 hover:shadow-[0_0_20px_rgba(46,49,146,0.5)] transition-all">
           ⬇ Export CSV
         </button>
       </div>
 
-      {/* Status summary */}
+      {/* Status filters */}
       <div className="grid grid-cols-3 gap-3">
-        {(Object.entries(counts) as [Status, number][]).map(([s, c]) => (
-          <button
-            key={s}
-            onClick={() => setFilter(filter === s ? 'all' : s)}
-            className={`bg-gray-900 border rounded-xl px-4 py-3 text-left transition-colors ${filter === s ? 'border-gray-600' : 'border-gray-800 hover:border-gray-700'}`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-2 h-2 rounded-full ${STATUS_META[s].dot}`} />
-              <span className="text-gray-400 text-xs">{STATUS_META[s].label}</span>
-            </div>
-            <div className={`text-2xl font-bold ${STATUS_META[s].color}`}>{c}</div>
-          </button>
-        ))}
+        {(Object.entries(counts) as [Status, number][]).map(([s, c]) => {
+          const meta = STATUS_META[s]
+          return (
+            <button key={s} onClick={() => setFilter(filter === s ? 'all' : s)}
+              className={`bg-[#1c1b1c] border p-4 text-left transition-colors relative group ${filter === s ? 'border-[#c0c1ff]/30' : 'border-[#464652]/15 hover:border-[#464652]/40'}`}>
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#c0c1ff] opacity-20 group-hover:opacity-40 transition-opacity" />
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`w-1.5 h-1.5 ${meta.dot}`} />
+                <span className={`font-[family-name:var(--font-body)] text-[9px] uppercase tracking-widest ${meta.color}`}>{meta.label}</span>
+              </div>
+              <div className={`font-[family-name:var(--font-headline)] text-3xl font-bold ${meta.color}`}>{c}</div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="text-center text-gray-500 py-20">Loading Dune + Supabase data…</div>
+        <div className="text-center font-[family-name:var(--font-body)] text-[#908f9d] text-xs uppercase tracking-widest py-20">Loading Dune + Supabase data…</div>
       ) : (
-        <div className="rounded-xl border border-gray-800 overflow-x-auto">
+        <div className="border border-[#464652]/15 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-400 uppercase tracking-wide border-b border-gray-800 bg-gray-900 text-left">
-                <th className="px-3 py-3 w-8">#</th>
-                <th className="px-3 py-3">Address</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Name</th>
-                <th className="px-3 py-3">Contact</th>
-                <th className="px-3 py-3 text-right">Score</th>
-                <th className="px-3 py-3 text-right">Txns</th>
-                <th className="px-3 py-3 text-right">Volume</th>
-                <th className="px-3 py-3 text-right">Contracts</th>
-                <th className="px-3 py-3">Action</th>
+              <tr className="bg-[#0e0e0f] border-b border-[#464652]/20 text-left">
+                {['#','Address','Status','Name','Contact','Score','Txns','Volume','Contracts','Action'].map(h => (
+                  <th key={h} className={`px-3 py-3 font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-widest ${['Score','Txns','Volume','Contracts'].includes(h) ? 'text-right' : ''}`}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(r => {
+              {filtered.map((r, idx) => {
                 const meta = STATUS_META[r.status]
                 return (
-                  <tr key={r.address} className={`border-b border-gray-800 last:border-0 ${r.status === 'registered' ? 'bg-emerald-950/20' : ''}`}>
-                    <td className="px-3 py-2.5 font-mono text-gray-400">
-                      {r.rank <= 3 ? medals[r.rank - 1] : r.rank}
+                  <tr key={r.address} className={`border-b border-[#464652]/10 last:border-0 hover:bg-[#201f20] transition-colors ${r.status === 'registered' ? 'bg-[#2e3192]/10' : idx % 2 === 0 ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'}`}>
+                    <td className="px-3 py-2.5 font-[family-name:var(--font-headline)] font-bold text-[#c0c1ff]">
+                      {r.rank <= 3 ? ['◈','◉','◇'][r.rank - 1] : `#${r.rank}`}
                     </td>
                     <td className="px-3 py-2.5 font-mono">
-                      <a href={`https://basescan.org/address/${r.address}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                      <a href={`https://basescan.org/address/${r.address}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">
                         {r.address.slice(0, 8)}…{r.address.slice(-4)}
                       </a>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={`flex items-center gap-1.5 ${meta.color}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot} shrink-0`} />
+                      <span className={`flex items-center gap-1.5 font-[family-name:var(--font-body)] ${meta.color}`}>
+                        <span className={`w-1.5 h-1.5 shrink-0 ${meta.dot}`} />
                         {meta.label}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-white font-medium whitespace-nowrap">
-                      {r.profile?.name ?? <span className="text-gray-600">—</span>}
+                    <td className="px-3 py-2.5 font-[family-name:var(--font-body)] font-bold text-[#e5e2e3] whitespace-nowrap">
+                      {r.profile?.name ?? <span className="text-[#464652]">—</span>}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        {r.profile?.email && <span className="text-gray-400">{r.profile.email}</span>}
-                        {r.profile?.x_username && (
-                          <a href={`https://x.com/${r.profile.x_username}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                            @{r.profile.x_username}
-                          </a>
-                        )}
-                        {r.profile?.telegram_handle && <span className="text-gray-400">@{r.profile.telegram_handle}</span>}
-                        {!r.profile && <span className="text-gray-600">—</span>}
+                      <div className="flex flex-col gap-0.5 font-[family-name:var(--font-body)]">
+                        {r.profile?.email && <span className="text-[#908f9d]">{r.profile.email}</span>}
+                        {r.profile?.x_username && <a href={`https://x.com/${r.profile.x_username}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">@{r.profile.x_username}</a>}
+                        {r.profile?.telegram_handle && <span className="text-[#908f9d]">@{r.profile.telegram_handle}</span>}
+                        {!r.profile && <span className="text-[#464652]">—</span>}
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-white">{fmt(r.activity_score)}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-300">{fmt(r.native_tx_count + r.token_tx_count)}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-300">{fmtUsd(r.total_token_volume_usd)}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-300">{r.contracts_deployed}</td>
+                    <td className="px-3 py-2.5 text-right font-[family-name:var(--font-headline)] font-bold text-[#c0c1ff]">{fmt(r.activity_score)}</td>
+                    <td className="px-3 py-2.5 text-right text-[#908f9d]">{fmt(r.native_tx_count + r.token_tx_count)}</td>
+                    <td className="px-3 py-2.5 text-right text-[#908f9d]">{fmtUsd(r.total_token_volume_usd)}</td>
+                    <td className="px-3 py-2.5 text-right text-[#908f9d]">{r.contracts_deployed}</td>
                     <td className="px-3 py-2.5">
                       {r.profile?.email ? (
-                        <a
-                          href={`mailto:${r.profile.email}?subject=ETH Cali OG NFT&body=Hi ${r.profile.name}, you are ranked #${r.rank} and eligible for the ETH Cali OG NFT! Please confirm your wallet ${r.address} to receive it.`}
-                          className="text-xs bg-emerald-900 hover:bg-emerald-800 text-emerald-300 rounded-lg px-2 py-1 transition-colors whitespace-nowrap"
-                        >
-                          ✉ Send claim
+                        <a href={`mailto:${r.profile.email}?subject=ETH Cali OG NFT&body=Hi ${r.profile.name}, you are ranked #${r.rank} and eligible for the ETH Cali OG NFT! Please confirm your wallet ${r.address} to receive it.`}
+                          className="font-[family-name:var(--font-body)] text-[9px] uppercase tracking-widest px-2 py-1 border border-[#c0c1ff]/20 text-[#c0c1ff] hover:bg-[#2e3192]/20 transition-colors whitespace-nowrap">
+                          ✉ Claim
                         </a>
                       ) : (
-                        <span className="text-gray-700 text-xs">No email</span>
+                        <span className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-widest">No email</span>
                       )}
                     </td>
                   </tr>

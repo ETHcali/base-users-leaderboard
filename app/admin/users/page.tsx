@@ -98,106 +98,92 @@ export default function UsersPage() {
       return new Date(b.registered_at).getTime() - new Date(a.registered_at).getTime()
     })
 
+  const dim = 'text-[#464652]'
+  const muted = 'text-[#908f9d]'
+
   return (
-    <div className="p-8 flex flex-col gap-6 max-w-7xl">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="p-8 flex flex-col gap-8 max-w-7xl">
+
+      {/* Header */}
+      <div className="flex items-end justify-between flex-wrap gap-6">
         <div>
-          <h1 className="text-2xl font-bold">Registered Users</h1>
-          <p className="text-gray-400 text-sm mt-1">Users who filled the claim/registration form</p>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#c0c1ff] uppercase tracking-[0.3em] mb-2">// operative_registry</p>
+          <h1 className="font-[family-name:var(--font-headline)] text-4xl font-extrabold text-[#e5e2e3] uppercase tracking-tight">Registered Users</h1>
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[#464652] uppercase tracking-wider mt-2">
+            <span className="text-[#e5e2e3]">{users.length}</span> total ·{' '}
+            <span className="text-[#c0c1ff]">{users.filter(u => u.rank !== null && u.rank <= 30).length}</span> in top 30
+          </p>
         </div>
-        <div className="flex gap-3 flex-wrap items-center">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm">
-            <span className="text-gray-500">Total</span>
-            <span className="ml-2 font-bold text-white">{users.length}</span>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm">
-            <span className="text-gray-500">Top 30</span>
-            <span className="ml-2 font-bold text-emerald-400">{users.filter(u => u.rank !== null && u.rank <= 30).length}</span>
-          </div>
-          <button onClick={() => exportCsv(filtered)} className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-xl px-4 py-2 transition-colors">
-            ⬇ Export CSV
-          </button>
-        </div>
+        <button onClick={() => exportCsv(filtered)}
+          className="cyber-gradient text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-[0.2em] px-6 py-3 hover:shadow-[0_0_20px_rgba(46,49,146,0.5)] transition-all">
+          ⬇ Export CSV
+        </button>
       </div>
 
       {/* Controls */}
       <div className="flex gap-3 flex-wrap items-center">
-        <input
-          type="text" placeholder="Search name, wallet, email, @handle…" value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 min-w-48 bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
+        <input type="text" placeholder="Search name, wallet, email, @handle…" value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-48 bg-transparent border-b border-[#464652]/40 focus:border-[#c0c1ff]/60 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-2 px-0 placeholder-[#464652] focus:outline-none transition-colors"
         />
         <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
-          className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+          className="bg-[#1c1b1c] border border-[#464652]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-2 px-3 focus:outline-none focus:border-[#c0c1ff]/60">
           <option value="registered_at">Newest first</option>
           <option value="rank">Leaderboard rank</option>
           <option value="activity_score">Score</option>
         </select>
-        <button
-          onClick={() => setFilterTop30(f => !f)}
-          className={`text-sm rounded-xl px-4 py-2.5 border transition-colors ${filterTop30 ? 'bg-emerald-900 border-emerald-600 text-emerald-300' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'}`}
-        >
-          🏆 Top 30 only
+        <button onClick={() => setFilterTop30(f => !f)}
+          className={`font-[family-name:var(--font-body)] text-xs uppercase tracking-widest px-4 py-2 border transition-colors ${filterTop30 ? 'border-[#c0c1ff]/40 text-[#c0c1ff] bg-[#2e3192]/10' : 'border-[#464652]/30 text-[#908f9d] hover:text-[#c0c1ff]'}`}>
+          ⚡ Top 30 only
         </button>
-        <span className="text-xs text-gray-600">{filtered.length} users</span>
+        <span className={`font-[family-name:var(--font-body)] text-[9px] ${dim} uppercase tracking-widest`}>{filtered.length} users</span>
       </div>
 
       {loading ? (
-        <div className="text-center text-gray-500 py-20">Loading…</div>
+        <div className={`text-center font-[family-name:var(--font-body)] ${muted} text-xs uppercase tracking-widest py-20`}>Loading…</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-800">
+        <div className="overflow-x-auto border border-[#464652]/15">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-gray-400 uppercase tracking-wide border-b border-gray-800 bg-gray-900 text-left">
-                <th className="px-3 py-3">Rank</th>
-                <th className="px-3 py-3">Name</th>
-                <th className="px-3 py-3">Wallet</th>
-                <th className="px-3 py-3">Email</th>
-                <th className="px-3 py-3">X</th>
-                <th className="px-3 py-3">Telegram</th>
-                <th className="px-3 py-3">WhatsApp</th>
-                <th className="px-3 py-3">Country</th>
-                <th className="px-3 py-3 text-right">Score</th>
-                <th className="px-3 py-3 text-right">Txns</th>
-                <th className="px-3 py-3 text-right">Volume</th>
-                <th className="px-3 py-3 text-right">Contracts</th>
-                <th className="px-3 py-3">Registered</th>
+              <tr className="bg-[#0e0e0f] border-b border-[#464652]/20 text-left">
+                {['Rank','Name','Wallet','Email','X','Telegram','WA','Country','Score','Txns','Volume','Contracts','Registered'].map(h => (
+                  <th key={h} className={`px-3 py-3 font-[family-name:var(--font-body)] text-[9px] ${muted} uppercase tracking-widest ${['Score','Txns','Volume','Contracts'].includes(h) ? 'text-right' : ''}`}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
-                <tr key={u.wallet_address} className={`border-b border-gray-800 last:border-0 hover:bg-gray-900/50 ${u.rank !== null && u.rank <= 30 ? 'bg-emerald-950/20' : ''}`}>
+              {filtered.map((u, idx) => (
+                <tr key={u.wallet_address} className={`border-b border-[#464652]/10 last:border-0 hover:bg-[#201f20] transition-colors ${u.rank !== null && u.rank <= 30 ? 'bg-[#2e3192]/10' : idx % 2 === 0 ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'}`}>
                   <td className="px-3 py-2.5 font-mono">
                     {u.rank !== null
-                      ? <span className={u.rank <= 30 ? 'text-emerald-400 font-bold' : 'text-gray-400'}>#{u.rank}</span>
-                      : <span className="text-gray-600">—</span>}
+                      ? <span className={u.rank <= 30 ? 'text-[#c0c1ff] font-bold' : muted}>#{u.rank}</span>
+                      : <span className={dim}>—</span>}
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-white whitespace-nowrap">{u.name}</td>
+                  <td className={`px-3 py-2.5 font-[family-name:var(--font-body)] font-bold text-[#e5e2e3] whitespace-nowrap`}>{u.name}</td>
                   <td className="px-3 py-2.5 font-mono">
-                    <a href={`https://basescan.org/address/${u.wallet_address}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                    <a href={`https://basescan.org/address/${u.wallet_address}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">
                       {u.wallet_address.slice(0, 6)}…{u.wallet_address.slice(-4)}
                     </a>
                   </td>
-                  <td className="px-3 py-2.5 text-gray-300">{u.email ?? <span className="text-gray-600">—</span>}</td>
+                  <td className={`px-3 py-2.5 ${muted}`}>{u.email ?? <span className={dim}>—</span>}</td>
                   <td className="px-3 py-2.5">
                     {u.x_username
-                      ? <a href={`https://x.com/${u.x_username}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">@{u.x_username}</a>
-                      : <span className="text-gray-600">—</span>}
+                      ? <a href={`https://x.com/${u.x_username}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">@{u.x_username}</a>
+                      : <span className={dim}>—</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-300">{u.telegram_handle ? `@${u.telegram_handle}` : <span className="text-gray-600">—</span>}</td>
-                  <td className="px-3 py-2.5 text-gray-300">{u.whatsapp ?? <span className="text-gray-600">—</span>}</td>
-                  <td className="px-3 py-2.5 text-gray-300">{u.country_code ? (COUNTRY_NAMES[u.country_code] ?? u.country_code) : <span className="text-gray-600">—</span>}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-white">{fmt(u.activity_score)}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-300">{fmt(u.native_tx_count !== null && u.token_tx_count !== null ? u.native_tx_count + u.token_tx_count : null)}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-300">{fmtUsd(u.total_token_volume_usd)}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-300">{fmt(u.contracts_deployed)}</td>
-                  <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">
+                  <td className={`px-3 py-2.5 ${muted}`}>{u.telegram_handle ? `@${u.telegram_handle}` : <span className={dim}>—</span>}</td>
+                  <td className={`px-3 py-2.5 ${muted}`}>{u.whatsapp ?? <span className={dim}>—</span>}</td>
+                  <td className={`px-3 py-2.5 ${muted}`}>{u.country_code ? (COUNTRY_NAMES[u.country_code] ?? u.country_code) : <span className={dim}>—</span>}</td>
+                  <td className="px-3 py-2.5 text-right font-[family-name:var(--font-headline)] font-bold text-[#c0c1ff]">{fmt(u.activity_score)}</td>
+                  <td className={`px-3 py-2.5 text-right ${muted}`}>{fmt(u.native_tx_count !== null && u.token_tx_count !== null ? u.native_tx_count + u.token_tx_count : null)}</td>
+                  <td className={`px-3 py-2.5 text-right ${muted}`}>{fmtUsd(u.total_token_volume_usd)}</td>
+                  <td className={`px-3 py-2.5 text-right ${muted}`}>{fmt(u.contracts_deployed)}</td>
+                  <td className={`px-3 py-2.5 ${dim} whitespace-nowrap`}>
                     {new Date(u.registered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={13} className="text-center text-gray-600 py-12">No users found.</td></tr>
+                <tr><td colSpan={13} className={`text-center ${dim} font-[family-name:var(--font-body)] text-xs uppercase tracking-widest py-12`}>No users found.</td></tr>
               )}
             </tbody>
           </table>
