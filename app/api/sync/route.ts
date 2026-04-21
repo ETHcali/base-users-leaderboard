@@ -125,8 +125,7 @@ async function fetchHoldersFromTransfers(baseUrl: string, address: string): Prom
     if (!items.length) break
 
     for (const item of items) {
-      const from = item.from?.hash?.toLowerCase()
-      const to   = item.to?.hash?.toLowerCase()
+      const to = item.to?.hash?.toLowerCase()
 
       // ERC-721: token ID is in total.token_id
       const tokenId = item.total?.token_id
