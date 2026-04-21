@@ -88,46 +88,61 @@ async function fetchNftHoldersBlockscout(address: string, chain: string, name: s
   return { source: `NFT ${chain}:${name} (Blockscout)`, count: addresses.size, addresses }
 }
 
+async function fetchTransfersPage(url: string): Promise<{ items: { tokenID?: string; to: string; from: string }[]; done: boolean }> {
+  const res = await fetch(url, { headers: { 'User-Agent': 'ETHCali-DatasetSync/1.0' } })
+  if (!res.ok) throw new Error(`Etherscan HTTP ${res.status}`)
+  const data = await res.json()
+  if (data.status === '0') {
+    const msg: string = data.message ?? ''
+    if (msg.toLowerCase().includes('no transactions') || msg.toLowerCase().includes('no records')) {
+      return { items: [], done: true }
+    }
+    throw new Error(`Etherscan error: ${msg} — ${JSON.stringify(data.result).slice(0, 120)}`)
+  }
+  if (!Array.isArray(data.result)) throw new Error(`Unexpected Etherscan response: ${JSON.stringify(data).slice(0, 120)}`)
+  return { items: data.result, done: data.result.length < 10000 }
+}
+
 async function fetchNftHoldersEtherscan(address: string, chain: string, name: string) {
   const chainId = ETHERSCAN_CHAIN_ID[chain]
   if (!chainId) throw new Error(`No Etherscan chain ID for chain: ${chain}`)
 
-  // Reconstruct current holders from transfer history:
-  // For each tokenId, track last `to` address = current holder
+  const zero = '0x0000000000000000000000000000000000000000'
+  const suffix = `&offset=10000&sort=asc&apikey=${ETHERSCAN_API_KEY}`
+
+  // ERC-721: track current owner per tokenId
   const tokenOwners = new Map<string, string>()
-  let page = 1
-
+  let page721 = 1
   while (true) {
-    const url = `https://api.etherscan.io/v2/api?module=account&action=tokennfttx` +
-      `&contractaddress=${address}&chainid=${chainId}` +
-      `&page=${page}&offset=10000&sort=asc&apikey=${ETHERSCAN_API_KEY}`
-
-    const res = await fetch(url, { headers: { 'User-Agent': 'ETHCali-DatasetSync/1.0' } })
-    if (!res.ok) throw new Error(`Etherscan HTTP ${res.status}`)
-    const data = await res.json()
-
-    if (data.status === '0' || !Array.isArray(data.result)) break
-
-    const transfers: { tokenID: string; to: string; from: string }[] = data.result
-    if (!transfers.length) break
-
-    for (const tx of transfers) {
+    const url = `https://api.etherscan.io/v2/api?module=account&action=tokennfttx&contractaddress=${address}&chainid=${chainId}&page=${page721}${suffix}`
+    const { items, done } = await fetchTransfersPage(url)
+    for (const tx of items) {
       const to = tx.to?.toLowerCase()
-      if (to && to !== '0x0000000000000000000000000000000000000000') {
-        tokenOwners.set(tx.tokenID, to)
-      } else {
-        // burned — remove
-        tokenOwners.delete(tx.tokenID)
-      }
+      if (to && to !== zero) tokenOwners.set(tx.tokenID ?? tx.to, to)
+      else if (tx.tokenID) tokenOwners.delete(tx.tokenID)
     }
-
-    // Etherscan max offset is 10000; if we got fewer, we're done
-    if (transfers.length < 10000) break
-    page++
+    if (done) break
+    page721++
     await sleep(250)
   }
 
-  const addresses = new Set(tokenOwners.values())
+  // ERC-1155: collect unique recipients (good-enough for eligibility)
+  const erc1155holders = new Set<string>()
+  let page1155 = 1
+  while (true) {
+    const url = `https://api.etherscan.io/v2/api?module=account&action=token1155tx&contractaddress=${address}&chainid=${chainId}&page=${page1155}${suffix}`
+    const { items, done } = await fetchTransfersPage(url)
+    for (const tx of items) {
+      const to = tx.to?.toLowerCase()
+      if (to && to !== zero) erc1155holders.add(to)
+    }
+    if (done) break
+    page1155++
+    await sleep(250)
+  }
+
+  const erc721holders = new Set(tokenOwners.values())
+  const addresses = new Set([...erc721holders, ...erc1155holders])
   return { source: `NFT ${chain}:${name} (Etherscan)`, count: addresses.size, addresses }
 }
 
