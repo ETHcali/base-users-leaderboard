@@ -25,7 +25,9 @@ function fmt(n: number) {
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stat[]>([])
   const [chainStats, setChainStats] = useState<Record<string, ChainStats | null>>({})
-  const [chainLoading, setChainLoading] = useState<Record<string, boolean>>({})
+  const [chainLoading, setChainLoading] = useState<Record<string, boolean>>(
+    Object.fromEntries(CHAINS.map(c => [c.key, true]))
+  )
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
