@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const maxDuration = 60
+
+// Server-side client: service role key bypasses RLS for admin writes
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const POAP_API_KEY      = process.env.NEXT_PUBLIC_POAP_API_KEY!
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY!
-
-const BLOCKSCOUT: Record<string, string> = {
-  base:     'https://base.blockscout.com',
-  optimism: 'https://optimism.blockscout.com',
-  polygon:  'https://polygon.blockscout.com',
-  ethereum: 'https://eth.blockscout.com',
-  unichain: 'https://unichain.blockscout.com',
-}
 
 const ETHERSCAN_CHAIN_ID: Record<string, number> = {
   ethereum: 1,
@@ -56,38 +51,6 @@ async function fetchPoapHolders(eventId: number, name: string) {
   return { source: `POAP #${eventId} — ${name}`, count: addresses.size, addresses }
 }
 
-async function fetchNftHoldersBlockscout(address: string, chain: string, name: string) {
-  const addresses = new Set<string>()
-  const base = BLOCKSCOUT[chain] ?? BLOCKSCOUT.base
-  let nextPageParams: Record<string, string> | null = null
-
-  while (true) {
-    let url = `${base}/api/v2/tokens/${address}/holders`
-    if (nextPageParams) url += '?' + new URLSearchParams(nextPageParams).toString()
-
-    const res = await fetch(url, { headers: { 'User-Agent': 'ETHCali-DatasetSync/1.0' } })
-    if (!res.ok) throw new Error(`Blockscout HTTP ${res.status} (${chain})`)
-    const data = await res.json()
-
-    const items: { address?: { hash?: string } | string }[] = data?.items ?? []
-    if (!items.length) break
-
-    for (const item of items) {
-      const raw = typeof item.address === 'string'
-        ? item.address
-        : (item.address as { hash?: string })?.hash
-      const a = raw?.toLowerCase()
-      if (a?.startsWith('0x')) addresses.add(a)
-    }
-
-    nextPageParams = data?.next_page_params ?? null
-    if (!nextPageParams) break
-    await sleep(300)
-  }
-
-  return { source: `NFT ${chain}:${name} (Blockscout)`, count: addresses.size, addresses }
-}
-
 async function fetchTransfersPage(url: string): Promise<{ items: { tokenID?: string; to: string; from: string }[]; done: boolean }> {
   const res = await fetch(url, { headers: { 'User-Agent': 'ETHCali-DatasetSync/1.0' } })
   if (!res.ok) throw new Error(`Etherscan HTTP ${res.status}`)
@@ -97,20 +60,21 @@ async function fetchTransfersPage(url: string): Promise<{ items: { tokenID?: str
     if (msg.toLowerCase().includes('no transactions') || msg.toLowerCase().includes('no records')) {
       return { items: [], done: true }
     }
-    throw new Error(`Etherscan error: ${msg} — ${JSON.stringify(data.result).slice(0, 120)}`)
+    throw new Error(`Etherscan: ${msg} — ${JSON.stringify(data.result).slice(0, 200)}`)
   }
-  if (!Array.isArray(data.result)) throw new Error(`Unexpected Etherscan response: ${JSON.stringify(data).slice(0, 120)}`)
+  if (!Array.isArray(data.result)) throw new Error(`Unexpected Etherscan response: ${JSON.stringify(data).slice(0, 200)}`)
   return { items: data.result, done: data.result.length < 10000 }
 }
 
-async function fetchNftHoldersEtherscan(address: string, chain: string, name: string) {
+async function fetchNftHolders(address: string, chain: string, name: string) {
   const chainId = ETHERSCAN_CHAIN_ID[chain]
-  if (!chainId) throw new Error(`No Etherscan chain ID for chain: ${chain}`)
+  if (!chainId) throw new Error(`Chain "${chain}" not supported by Etherscan`)
+  if (!ETHERSCAN_API_KEY) throw new Error('ETHERSCAN_API_KEY env var is not set')
 
   const zero = '0x0000000000000000000000000000000000000000'
   const suffix = `&offset=10000&sort=asc&apikey=${ETHERSCAN_API_KEY}`
 
-  // ERC-721: track current owner per tokenId
+  // ERC-721: reconstruct current owner per tokenId from transfer history
   const tokenOwners = new Map<string, string>()
   let page721 = 1
   while (true) {
@@ -118,7 +82,7 @@ async function fetchNftHoldersEtherscan(address: string, chain: string, name: st
     const { items, done } = await fetchTransfersPage(url)
     for (const tx of items) {
       const to = tx.to?.toLowerCase()
-      if (to && to !== zero) tokenOwners.set(tx.tokenID ?? tx.to, to)
+      if (to && to !== zero && tx.tokenID != null) tokenOwners.set(tx.tokenID, to)
       else if (tx.tokenID) tokenOwners.delete(tx.tokenID)
     }
     if (done) break
@@ -141,13 +105,8 @@ async function fetchNftHoldersEtherscan(address: string, chain: string, name: st
     await sleep(250)
   }
 
-  const erc721holders = new Set(tokenOwners.values())
-  const addresses = new Set([...erc721holders, ...erc1155holders])
-  return { source: `NFT ${chain}:${name} (Etherscan)`, count: addresses.size, addresses }
-}
-
-async function fetchNftHolders(address: string, chain: string, name: string) {
-  return fetchNftHoldersEtherscan(address, chain, name)
+  const addresses = new Set([...tokenOwners.values(), ...erc1155holders])
+  return { source: `NFT ${chain}:${name}`, count: addresses.size, addresses }
 }
 
 // Body shape:
@@ -171,11 +130,13 @@ export async function POST(req: Request) {
       const result = await fetchPoapHolders(eventId, row.name)
       result.addresses.forEach(a => allAddresses.add(a))
       bySource.push({ source: result.source, count: result.count })
-      await supabase.from('poap_sources').update({
+      const { error } = await supabase.from('poap_sources').update({
         holder_count: result.count,
         last_synced_at: new Date().toISOString(),
       }).eq('event_id', eventId)
+      if (error) console.error('Supabase poap update error:', error.message)
     } catch (err) {
+      console.error('fetchPoapHolders error:', err)
       bySource.push({ source: `POAP #${eventId}`, count: 0, error: String(err) })
     }
 
@@ -188,11 +149,13 @@ export async function POST(req: Request) {
       const result = await fetchNftHolders(row.address, row.chain, row.name)
       result.addresses.forEach(a => allAddresses.add(a))
       bySource.push({ source: result.source, count: result.count })
-      await supabase.from('nft_sources').update({
+      const { error } = await supabase.from('nft_sources').update({
         holder_count: result.count,
         last_synced_at: new Date().toISOString(),
       }).eq('address', address)
+      if (error) console.error('Supabase nft update error:', error.message)
     } catch (err) {
+      console.error('fetchNftHolders error:', err)
       bySource.push({ source: `NFT ${row.chain}:${row.name}`, count: 0, error: String(err) })
     }
 
@@ -212,6 +175,7 @@ export async function POST(req: Request) {
           last_synced_at: new Date().toISOString(),
         }).eq('event_id', poap.event_id)
       } catch (err) {
+        console.error(`POAP #${poap.event_id} error:`, err)
         bySource.push({ source: `POAP #${poap.event_id} — ${poap.name}`, count: 0, error: String(err) })
       }
       await sleep(400)
@@ -227,6 +191,7 @@ export async function POST(req: Request) {
           last_synced_at: new Date().toISOString(),
         }).eq('address', nft.address)
       } catch (err) {
+        console.error(`NFT ${nft.chain}:${nft.name} error:`, err)
         bySource.push({ source: `NFT ${nft.chain}:${nft.name}`, count: 0, error: String(err) })
       }
       await sleep(400)

@@ -174,13 +174,15 @@ export default function SourcesPage() {
 
   async function syncOne(row: UnifiedRow) {
     const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
-    setSyncingRow(key)
+    setSyncingRow(key); setSyncResult(null); setSyncError(null)
     try {
       const body = row.kind === 'poap'
         ? { type: 'poap', id: row.event_id }
         : { type: 'nft', id: row.address }
       const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error(`Server error: ${res.status}`)
+      const data: SyncResult = await res.json()
+      setSyncResult(data)
       loadSources(); loadDatasetCount()
     } catch (err) {
       setSyncError(String(err))
