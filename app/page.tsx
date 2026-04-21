@@ -14,12 +14,12 @@ const TOP_N = 30
 type ChainKey = 'all' | 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
 
 const CHAINS = [
-  { key: 'base',     label: 'Base',     queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_BASE     ?? '6634911', explorer: 'https://basescan.org/address/' },
-  { key: 'ethereum', label: 'Ethereum', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM ?? '',        explorer: 'https://etherscan.io/address/' },
-  { key: 'optimism', label: 'Optimism', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM ?? '',        explorer: 'https://optimistic.etherscan.io/address/' },
-  { key: 'polygon',  label: 'Polygon',  queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON  ?? '',        explorer: 'https://polygonscan.com/address/' },
-  { key: 'gnosis',   label: 'Gnosis',   queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS   ?? '',        explorer: 'https://gnosisscan.io/address/' },
-  { key: 'unichain', label: 'Unichain', queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '',        explorer: 'https://uniscan.xyz/address/' },
+  { key: 'base',     label: 'Base',     logo: '/chains/base logo.svg',    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_BASE     ?? '6634911', explorer: 'https://basescan.org/address/' },
+  { key: 'ethereum', label: 'ETH',      logo: '/chains/ethereum.png',     queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM ?? '',        explorer: 'https://etherscan.io/address/' },
+  { key: 'optimism', label: 'OP',       logo: '/chains/op mainnet.png',   queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM ?? '',        explorer: 'https://optimistic.etherscan.io/address/' },
+  { key: 'polygon',  label: 'Polygon',  logo: '/chains/polygon.png',      queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON  ?? '',        explorer: 'https://polygonscan.com/address/' },
+  { key: 'gnosis',   label: 'Gnosis',   logo: '/chains/gnosis.png',       queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS   ?? '',        explorer: 'https://gnosisscan.io/address/' },
+  { key: 'unichain', label: 'Unichain', logo: '/chains/unichain.png',     queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '',        explorer: 'https://uniscan.xyz/address/' },
 ] as const
 
 type Row = {
@@ -53,37 +53,21 @@ function fmtScore(n: number) {
   return fmt(n)
 }
 
-function LogLine({ time, msg, type = 'info' }: { time: string; msg: string; type?: 'info' | 'warn' | 'ok' }) {
-  const color = type === 'warn' ? 'text-[#ffb4ab]' : type === 'ok' ? 'text-[#c0c1ff]' : 'text-[#c0c1ff]'
-  return (
-    <div className="flex gap-2 text-[#c7c5d4]">
-      <span className={`${color} shrink-0`}>[{time}]</span>
-      <span>&gt; {msg}</span>
-    </div>
-  )
-}
 
 export default function Home() {
   const { address, isConnected } = useAccount()
   const [activeChain, setActiveChain] = useState<ChainKey>('all')
   const [rowsByChain, setRowsByChain] = useState<Partial<Record<string, Row[]>>>({})
   const [loadingChains, setLoadingChains] = useState<Partial<Record<string, boolean>>>({})
-  const [logLines, setLogLines] = useState<{ time: string; msg: string; type?: 'info' | 'warn' | 'ok' }[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [showRegister, setShowRegister] = useState(false)
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(30)
 
-  function addLog(msg: string, type: 'info' | 'warn' | 'ok' = 'info') {
-    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    setLogLines(prev => [...prev.slice(-20), { time, msg, type }])
-  }
-
   async function fetchChain(key: string) {
     const cfg = CHAINS.find(c => c.key === key)
     if (!cfg?.queryId || rowsByChain[key] !== undefined) return
     setLoadingChains(prev => ({ ...prev, [key]: true }))
-    addLog(`Initializing ${cfg.label} data stream...`)
     try {
       const res = await fetch(
         `https://api.dune.com/api/v1/query/${cfg.queryId}/results?limit=500`,
@@ -93,19 +77,14 @@ export default function Home() {
       const data = await res.json()
       const rows: Row[] = data.result?.rows ?? []
       setRowsByChain(prev => ({ ...prev, [key]: rows }))
-      addLog(`${cfg.label} — ${rows.length} operatives indexed`, 'ok')
-    } catch (err) {
-      addLog(`WARN: ${cfg.label} endpoint error — ${err}`, 'warn')
+    } catch {
       setRowsByChain(prev => ({ ...prev, [key]: [] }))
     } finally {
       setLoadingChains(prev => ({ ...prev, [key]: false }))
     }
   }
 
-  // Load all chains at startup for "All Chains" aggregation
   useEffect(() => {
-    addLog('System boot sequence initiated...')
-    addLog('Connecting to Dune Analytics relay...')
     CHAINS.forEach(c => { if (c.queryId) fetchChain(c.key) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -214,24 +193,37 @@ export default function Home() {
 
           {/* Chain tabs */}
           <div className="flex flex-wrap gap-1 bg-[#1c1b1c] p-1 border border-[#464652]/20">
-            {[{ key: 'all', label: 'All Chains' }, ...CHAINS].map(c => {
+            {/* All Chains tab */}
+            <button
+              onClick={() => { setActiveChain('all'); setVisibleCount(30); setSearch('') }}
+              className={`flex items-center gap-2 px-4 py-2 font-label text-xs uppercase tracking-widest transition-all ${
+                activeChain === 'all' ? 'bg-[#2e3192] text-[#c0c1ff]' : 'text-[#c7c5d4]/50 hover:text-[#c0c1ff] hover:bg-[#2e3192]/20'
+              }`}
+              style={activeChain === 'all' ? { boxShadow: '0 0 20px rgba(46,49,146,0.4)' } : {}}
+            >
+              <span className="text-sm">◈</span>
+              <span className="hidden sm:inline">All</span>
+            </button>
+            {CHAINS.map(c => {
               const isActive = activeChain === c.key
-              const isAvail = c.key === 'all' || !!(CHAINS.find(ch => ch.key === c.key)?.queryId)
+              const isAvail = !!c.queryId
               return (
                 <button
                   key={c.key}
                   onClick={() => { setActiveChain(c.key as ChainKey); setVisibleCount(30); setSearch('') }}
                   disabled={!isAvail}
-                  className={`px-4 py-2 font-label text-xs uppercase tracking-widest transition-all ${
+                  className={`flex items-center gap-2 px-3 py-2 font-label text-xs uppercase tracking-widest transition-all ${
                     isActive
                       ? 'bg-[#2e3192] text-[#c0c1ff]'
                       : isAvail
                       ? 'text-[#c7c5d4]/50 hover:text-[#c0c1ff] hover:bg-[#2e3192]/20'
-                      : 'text-[#464652] cursor-not-allowed'
+                      : 'text-[#464652] cursor-not-allowed opacity-40'
                   }`}
                   style={isActive ? { boxShadow: '0 0 20px rgba(46,49,146,0.4)' } : {}}
                 >
-                  {c.label}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.logo} alt={c.label} className="w-4 h-4 object-contain" />
+                  <span className="hidden sm:inline">{c.label}</span>
                 </button>
               )
             })}
@@ -312,11 +304,9 @@ export default function Home() {
           </section>
         )}
 
-        {/* ── MAIN GRID: TABLE + LOG ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* ELITE OPERATIVES TABLE */}
-          <div className="lg:col-span-2 space-y-4">
+        {/* ── ELITE OPERATIVES TABLE ── */}
+        <div>
+          <div className="space-y-4">
             <div className="flex justify-between items-center pb-3 border-b border-[#464652]/20">
               <h2 className="font-headline text-sm text-[#c0c1ff] uppercase tracking-[0.25em]" style={{ textShadow: '0 0 12px rgba(192,193,255,0.4)' }}>
                 Elite Operatives
@@ -351,9 +341,6 @@ export default function Home() {
                   const rank = activeRows.indexOf(row) + 1
                   const isMe = address && row.address.toLowerCase() === address.toLowerCase()
                   const inTop30 = rank <= TOP_N
-                  const winRate = activeRows[0]?.activity_score
-                    ? Math.round((row.activity_score / activeRows[0].activity_score) * 100)
-                    : 0
                   const isAlt = i % 2 === 0
 
                   return (
@@ -394,14 +381,26 @@ export default function Home() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className="text-right hidden lg:block">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Txns</p>
+                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.native_tx_count)}</p>
+                        </div>
+                        <div className="text-right hidden lg:block">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Token Txns</p>
+                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.token_tx_count)}</p>
+                        </div>
                         <div className="text-right hidden md:block">
                           <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Volume</p>
                           <p className="font-body text-sm text-[#e5e2e3]">{fmtUsd(row.total_token_volume_usd)}</p>
                         </div>
-                        <div className="text-right hidden sm:block">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Activity</p>
-                          <p className="font-body text-sm text-[#e5e2e3]">{winRate}%</p>
+                        <div className="text-right hidden md:block">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Contracts</p>
+                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.contracts_deployed)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Score</p>
+                          <p className="font-headline text-sm font-bold text-[#c0c1ff]">{fmtScore(row.activity_score)}</p>
                         </div>
                       </div>
                     </div>
@@ -418,29 +417,6 @@ export default function Home() {
                 Load More Data — {filtered.length - visibleCount} remaining
               </button>
             )}
-          </div>
-
-          {/* SYSTEM LOG */}
-          <div className="bg-[#1c1b1c] border border-[#464652]/15 p-6 relative flex flex-col min-h-[400px]">
-            <div className="absolute top-2 right-2 text-[#c0c1ff]/20 text-base">⊡</div>
-            <h3 className="font-headline text-xs text-[#e5e2e3] uppercase tracking-[0.25em] mb-4 pb-3 border-b border-[#464652]/20">
-              System Log
-            </h3>
-            <div className="flex-grow space-y-2.5 font-label text-[11px] overflow-y-auto pr-1">
-              {logLines.map((l, i) => (
-                <LogLine key={i} time={l.time} msg={l.msg} type={l.type} />
-              ))}
-              <div className="flex gap-2 text-[#c7c5d4]/30">
-                <span className="text-[#c0c1ff]/40 shrink-0">[{new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
-                <span className="animate-pulse">_ Awaiting input...</span>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-[#464652]/20">
-              <div className="flex items-center gap-2 font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">
-                <span className="w-2 h-2 rounded-full bg-[#c0c1ff]" style={{ boxShadow: '0 0 6px #c0c1ff' }} />
-                {isLoadingAny ? 'Syncing chains...' : 'System Online'}
-              </div>
-            </div>
           </div>
         </div>
 
