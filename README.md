@@ -1,4 +1,4 @@
-# ETH Cali — Base Users Leaderboard
+# ETH Cali — Multi-Chain Activity Leaderboard
 
 Onchain activity leaderboard for wallets onboarded by [ETH Cali](https://ethcali.org), a Colombian Web3 education community building the next generation of Latin American builders.
 
@@ -13,8 +13,9 @@ Onchain activity leaderboard for wallets onboarded by [ETH Cali](https://ethcali
 ## What it does
 
 ### Public leaderboard (`/`)
-- Ranked table of all ETH Cali onboarded wallets active on **Base Network**
-- 8 live aggregate metrics: native txns, ERC-20 txns, token volume, contracts deployed, top score, avg score, power users, top-30 cutoff
+- Chain tabs: **Base · Ethereum · Optimism · Polygon · Gnosis · Unichain**
+- Ranked table of all ETH Cali onboarded wallets per selected chain
+- 8 live aggregate metrics: total txns, native txns, token txns, ERC-20 volume, contracts deployed, top score, avg score, top-30 cutoff
 - Connect your wallet to see your rank, score breakdown, and top-30 eligibility
 - Progress bar showing how far you are from the top 30
 
@@ -28,8 +29,8 @@ Password-protected, sidebar navigation with 5 pages:
 
 | Page | Description |
 |------|-------------|
-| **Dashboard** | KPI cards: POAP sources, NFT contracts, unique addresses, registered users, top-30 registered. One-click sync. |
-| **Sources** | Unified table of all 17 POAP events + 16 NFT contracts with chain logos. Filter by type (POAP/NFT) and chain. Add or remove sources. |
+| **Dashboard** | Dataset KPI cards (POAP sources, NFT contracts, unique addresses, registered users) + per-chain Dune stats (wallets, top score, total txns). One-click sync. |
+| **Sources** | Unified table of all POAP events + NFT contracts with chain logos. Filter by type (POAP/NFT) and chain. Add, edit, or remove sources. Per-row sync with holder count. |
 | **Dataset** | Browse all unique wallet addresses (paginated). Search by prefix. Export CSV for Dune upload. |
 | **Users** | All registered users enriched with Dune rank + score. Filter to top 30. Export CSV. |
 | **Top 30** | Reconciliation screen: Dune top 30 joined with registered users and dataset. Status per wallet (Registered / In dataset / Unknown). Mailto claim button. |
@@ -40,20 +41,36 @@ Password-protected, sidebar navigation with 5 pages:
 
 | Action | Points |
 |--------|--------|
-| Native ETH transaction | 1 pt each |
+| Native transaction | 1 pt each |
 | ERC-20 token transfer | 2 pts each |
 | $100 token volume | 1 pt |
 | Smart contract deployed | 3 pts each |
 
-Data: [Dune Analytics query 6634911](https://dune.com/queries/6634911) · Chain: Base · All-time since Aug 2023
+Same formula applied across all 6 chains.  
+Data: Dune Analytics · All-time
+
+---
+
+## Dune queries
+
+| Chain | Query |
+|-------|-------|
+| Base | [6634911](https://dune.com/queries/6634911) |
+| Ethereum | [7347012](https://dune.com/queries/7347012) |
+| Optimism | [7346993](https://dune.com/queries/7346993) |
+| Polygon | [7346995](https://dune.com/queries/7346995) |
+| Gnosis | [7346996](https://dune.com/queries/7346996) |
+| Unichain | [7346997](https://dune.com/queries/7346997) |
+
+SQL templates: `docsdune/queries/{chain}.sql`
 
 ---
 
 ## Dataset sync
 
 The wallet dataset is built from ETH Cali event history:
-- **17 POAP events** fetched via POAP API (`api.poap.tech`)
-- **16 Unlock Protocol NFT contracts** across Base, Optimism, and Polygon fetched via Blockscout REST API
+- **POAP events** fetched via POAP API (`api.poap.tech`)
+- **Unlock Protocol NFT contracts** across Base, Optimism, and Polygon fetched via Blockscout REST API
 
 Sync runs server-side (`POST /api/sync`) to avoid CORS. Results are stored in Supabase `dataset_addresses` and exported as CSV for Dune upload.
 
@@ -100,6 +117,12 @@ Outputs `public/dataset.csv` — upload to Dune to refresh the leaderboard datas
 
 ```bash
 NEXT_PUBLIC_DUNE_API_KEY=               # Dune API key
+NEXT_PUBLIC_DUNE_QUERY_ID_BASE=6634911  # Dune query — Base
+NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM=7347012  # Dune query — Ethereum
+NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM=7346993  # Dune query — Optimism
+NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON=7346995   # Dune query — Polygon
+NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS=7346996    # Dune query — Gnosis
+NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN=7346997  # Dune query — Unichain
 NEXT_PUBLIC_SUPABASE_URL=               # Supabase project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=          # Supabase anon key
 NEXT_PUBLIC_ADMIN_PASSWORD=             # Admin panel password
@@ -111,14 +134,16 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=   # WalletConnect (cloud.walletconnect.com
 
 ## Roadmap
 
-- [x] Base Network leaderboard with activity scoring
-- [x] 8-metric live dashboard stats grid
+- [x] Multi-chain leaderboard — Base, Ethereum, Optimism, Polygon, Gnosis, Unichain tabs
+- [x] 6 Dune queries live (one per chain), SQL templates in `docsdune/queries/`
+- [x] 8-metric live dashboard stats grid per chain
+- [x] Admin dashboard — per-chain stats (wallets, top score, total txns)
 - [x] Wallet connect + top-30 eligibility check
 - [x] User registration via Supabase (name, email, X, Telegram, WhatsApp, country)
 - [x] `/claim` page — top-30 metrics card + OG NFT claim submit
 - [x] ETH Cali branding favicon
 - [x] Admin panel — sidebar shell with 5 focused pages
-- [x] Sources manager — unified POAP/NFT table, chain logos, type + chain filters
+- [x] Sources manager — unified POAP/NFT table, chain logos, type + chain filters, inline edit, per-row sync
 - [x] Server-side dataset sync (POAP API + Blockscout, CORS-safe)
 - [x] 17 POAP events + 16 NFT contracts seeded from event history
 - [x] Dataset browser — paginated, searchable, CSV export
@@ -126,7 +151,6 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=   # WalletConnect (cloud.walletconnect.com
 - [ ] ERC-721 OG NFT contract on Base — mint to top 30 on-chain
 - [ ] Merkle whitelist script — reads top 30 from Dune, updates contract allowlist
 - [ ] Automate dataset sync on schedule (Vercel cron / GitHub Actions)
-- [ ] Expand leaderboard to Ethereum, Optimism, Arbitrum, Polygon
 
 ---
 

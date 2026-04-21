@@ -3,13 +3,66 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { RegisterModal } from './components/RegisterModal'
 import { supabase, type UserProfile } from '@/lib/supabase'
 
-const DUNE_QUERY_ID = '6634911'
 const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
 const TOP_N = 30
+
+type ChainKey = 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
+
+const CHAINS: { key: ChainKey; label: string; logo: string; color: string; explorer: string; queryId: string }[] = [
+  {
+    key: 'base',
+    label: 'Base',
+    logo: '/chains/base logo.svg',
+    color: 'text-blue-400',
+    explorer: 'https://basescan.org/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_BASE ?? '6634911',
+  },
+  {
+    key: 'ethereum',
+    label: 'Ethereum',
+    logo: '/chains/ethereum.png',
+    color: 'text-gray-300',
+    explorer: 'https://etherscan.io/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM ?? '',
+  },
+  {
+    key: 'optimism',
+    label: 'Optimism',
+    logo: '/chains/op mainnet.png',
+    color: 'text-red-400',
+    explorer: 'https://optimistic.etherscan.io/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM ?? '',
+  },
+  {
+    key: 'polygon',
+    label: 'Polygon',
+    logo: '/chains/polygon.png',
+    color: 'text-purple-400',
+    explorer: 'https://polygonscan.com/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON ?? '',
+  },
+  {
+    key: 'gnosis',
+    label: 'Gnosis',
+    logo: '/chains/gnosis.png',
+    color: 'text-emerald-400',
+    explorer: 'https://gnosisscan.io/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS ?? '',
+  },
+  {
+    key: 'unichain',
+    label: 'Unichain',
+    logo: '/chains/unichain.png',
+    color: 'text-pink-400',
+    explorer: 'https://uniscan.xyz/address/',
+    queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '',
+  },
+]
 
 type Row = {
   address: string
@@ -46,10 +99,10 @@ function fmtUsd(n: number) {
 
 function ScoreTooltip({ row }: { row: Row }) {
   const parts = [
-    { label: 'Native txns', value: row.native_tx_count, pts: row.native_tx_count * 1, formula: `${fmt(row.native_tx_count)} × 1` },
-    { label: 'Token txns', value: row.token_tx_count, pts: row.token_tx_count * 2, formula: `${fmt(row.token_tx_count)} × 2` },
-    { label: 'Volume', value: row.total_token_volume_usd, pts: row.total_token_volume_usd / 100, formula: `$${fmt(row.total_token_volume_usd)} ÷ 100` },
-    { label: 'Contracts', value: row.contracts_deployed, pts: row.contracts_deployed * 3, formula: `${row.contracts_deployed} × 3` },
+    { label: 'Native txns', pts: row.native_tx_count * 1, formula: `${fmt(row.native_tx_count)} × 1` },
+    { label: 'Token txns', pts: row.token_tx_count * 2, formula: `${fmt(row.token_tx_count)} × 2` },
+    { label: 'Volume', pts: row.total_token_volume_usd / 100, formula: `$${fmt(row.total_token_volume_usd)} ÷ 100` },
+    { label: 'Contracts', pts: row.contracts_deployed * 3, formula: `${row.contracts_deployed} × 3` },
   ]
   return (
     <div className="absolute z-10 right-0 top-6 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl p-3 text-xs text-left">
@@ -70,34 +123,52 @@ function ScoreTooltip({ row }: { row: Row }) {
 
 export default function Home() {
   const { address, isConnected } = useAccount()
-  const [rows, setRows] = useState<Row[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [activeChain, setActiveChain] = useState<ChainKey>('base')
+  const [rowsByChain, setRowsByChain] = useState<Partial<Record<ChainKey, Row[]>>>({})
+  const [updatedByChain, setUpdatedByChain] = useState<Partial<Record<ChainKey, string>>>({})
+  const [loadingChains, setLoadingChains] = useState<Partial<Record<ChainKey, boolean>>>({ base: true })
+  const [errorByChain, setErrorByChain] = useState<Partial<Record<ChainKey, string>>>({})
   const [search, setSearch] = useState('')
   const [hoveredScore, setHoveredScore] = useState<string | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [showRegister, setShowRegister] = useState(false)
 
-  useEffect(() => {
-    async function fetchLeaderboard() {
-      try {
-        const res = await fetch(
-          `https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/results?limit=500`,
-          { headers: { 'X-Dune-API-Key': DUNE_API_KEY } }
-        )
-        if (!res.ok) throw new Error('Failed to fetch leaderboard')
-        const data: DuneResponse = await res.json()
-        setRows(data.result.rows ?? [])
-        setLastUpdated(data.execution_ended_at ?? null)
-      } catch {
-        setError('Could not load leaderboard. Try again later.')
-      } finally {
-        setLoading(false)
-      }
+  const chain = CHAINS.find(c => c.key === activeChain)!
+  const rows = rowsByChain[activeChain] ?? []
+  const loading = loadingChains[activeChain] ?? false
+  const error = errorByChain[activeChain]
+  const lastUpdated = updatedByChain[activeChain]
+
+  async function fetchChain(key: ChainKey) {
+    const cfg = CHAINS.find(c => c.key === key)!
+    if (!cfg.queryId) return
+    if (rowsByChain[key] !== undefined) return // already loaded
+
+    setLoadingChains(prev => ({ ...prev, [key]: true }))
+    try {
+      const res = await fetch(
+        `https://api.dune.com/api/v1/query/${cfg.queryId}/results?limit=500`,
+        { headers: { 'X-Dune-API-Key': DUNE_API_KEY } }
+      )
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data: DuneResponse = await res.json()
+      setRowsByChain(prev => ({ ...prev, [key]: data.result.rows ?? [] }))
+      setUpdatedByChain(prev => ({ ...prev, [key]: data.execution_ended_at ?? '' }))
+    } catch {
+      setErrorByChain(prev => ({ ...prev, [key]: 'Could not load leaderboard. Try again later.' }))
+      setRowsByChain(prev => ({ ...prev, [key]: [] }))
+    } finally {
+      setLoadingChains(prev => ({ ...prev, [key]: false }))
     }
-    fetchLeaderboard()
-  }, [])
+  }
+
+  useEffect(() => { fetchChain('base') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleChainTab(key: ChainKey) {
+    setActiveChain(key)
+    setSearch('')
+    fetchChain(key)
+  }
 
   useEffect(() => {
     if (!address) { setProfile(null); return }
@@ -114,336 +185,313 @@ export default function Home() {
     : 0
   const isTop30 = userRank > 0 && userRank <= TOP_N
   const userRow = address ? rows.find(r => r.address.toLowerCase() === address.toLowerCase()) : null
-
   const top30Score = rows[TOP_N - 1]?.activity_score ?? 0
   const firstScore = rows[0]?.activity_score ?? 1
-
   const filtered = search.trim()
     ? rows.filter(r => r.address.toLowerCase().includes(search.trim().toLowerCase()))
     : rows
 
   return (
     <>
-    {showRegister && address && (
-      <RegisterModal
-        walletAddress={address}
-        onClose={() => setShowRegister(false)}
-        onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/claim' }}
-      />
-    )}
-    <main className="max-w-5xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
+      {showRegister && address && (
+        <RegisterModal
+          walletAddress={address}
+          onClose={() => setShowRegister(false)}
+          onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/claim' }}
+        />
+      )}
+      <main className="max-w-5xl mx-auto w-full px-4 py-10 flex flex-col gap-8">
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <span className="text-2xl">⛓️</span>
-            <h1 className="text-3xl font-bold tracking-tight">ETH Cali Leaderboard</h1>
-            <span className="text-xs bg-blue-900 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-medium">Base Network</span>
-          </div>
-          <p className="text-gray-400 text-sm">
-            Onchain activity of users onboarded by{' '}
-            <a href="https://ethcali.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ETH Cali</a>
-            {' · '}All-time since Base launch (Aug 2023)
-            {lastUpdated && (
-              <span className="text-gray-600 ml-2">
-                · Updated {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
-            )}
-          </p>
-        </div>
-        <ConnectButton />
-      </div>
-
-      {/* Wallet status banner */}
-      {isConnected && address && (
-        <div className={`rounded-xl px-5 py-4 border text-sm ${
-          isTop30
-            ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
-            : userRank > 0
-            ? 'bg-blue-950 border-blue-700 text-blue-300'
-            : 'bg-gray-900 border-gray-700 text-gray-400'
-        }`}>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xl">{isTop30 ? '🏆' : userRank > 0 ? '📊' : '👋'}</span>
-            <div className="flex-1 flex flex-wrap items-center gap-3">
-              {isTop30 ? (
-                <>
-                  <span>
-                    <strong>You&apos;re #{userRank} on the leaderboard!</strong> You qualify for the ETH Cali OG NFT.
-                  </span>
-                  {profile ? (
-                    <Link href="/claim" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                      🏅 Claim your NFT →
-                    </Link>
-                  ) : (
-                    <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
-                  )}
-                </>
-              ) : userRank > 0 ? (
-                <>
-                  <span>
-                    You&apos;re ranked <strong>#{userRank}</strong> out of {rows.length} users
-                    {userRow && (
-                      <> · Score: <strong>{fmt(userRow.activity_score)}</strong>
-                      {' '}({fmt(top30Score - userRow.activity_score)} pts to top 30)</>
-                    )}
-                  </span>
-                  {profile
-                    ? <span className="text-blue-400 text-xs">✓ <strong>{profile.name}</strong></span>
-                    : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register profile →</button>
-                  }
-                </>
-              ) : (
-                <span>
-                  <strong>{shortAddr(address)}</strong> is not in the ETH Cali dataset yet.
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">⛓️</span>
+              <h1 className="text-3xl font-bold tracking-tight">ETH Cali Leaderboard</h1>
+            </div>
+            <p className="text-gray-400 text-sm">
+              Onchain activity of users onboarded by{' '}
+              <a href="https://ethcali.org" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ETH Cali</a>
+              {' · '}All-time activity per chain
+              {lastUpdated && (
+                <span className="text-gray-600 ml-2">
+                  · Updated {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               )}
-            </div>
+            </p>
           </div>
-          {/* Progress bar to top 30 for non-top-30 users */}
-          {userRank > TOP_N && userRow && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>Progress to top 30</span>
-                <span>{fmt(userRow.activity_score)} / {fmt(top30Score)} pts</span>
-              </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (userRow.activity_score / top30Score) * 100).toFixed(1)}%` }}
-                />
+          <ConnectButton />
+        </div>
+
+        {/* Chain tabs */}
+        <div className="flex gap-2 flex-wrap">
+          {CHAINS.map(c => {
+            const isActive = c.key === activeChain
+            const isAvailable = !!c.queryId
+            return (
+              <button
+                key={c.key}
+                onClick={() => isAvailable && handleChainTab(c.key)}
+                disabled={!isAvailable}
+                title={!isAvailable ? 'Query coming soon' : undefined}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all border ${
+                  isActive
+                    ? 'bg-gray-800 border-gray-600 text-white'
+                    : isAvailable
+                    ? 'border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                    : 'border-gray-900 text-gray-700 cursor-not-allowed'
+                }`}
+              >
+                <Image src={c.logo} alt={c.label} width={16} height={16} className="rounded-sm" />
+                {c.label}
+                {!isAvailable && <span className="text-xs text-gray-700">soon</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Wallet status banner */}
+        {isConnected && address && rows.length > 0 && (
+          <div className={`rounded-xl px-5 py-4 border text-sm ${
+            isTop30
+              ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
+              : userRank > 0
+              ? 'bg-blue-950 border-blue-700 text-blue-300'
+              : 'bg-gray-900 border-gray-700 text-gray-400'
+          }`}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-xl">{isTop30 ? '🏆' : userRank > 0 ? '📊' : '👋'}</span>
+              <div className="flex-1 flex flex-wrap items-center gap-3">
+                {isTop30 ? (
+                  <>
+                    <span>
+                      <strong>You&apos;re #{userRank} on {chain.label}!</strong> You qualify for the ETH Cali OG NFT.
+                    </span>
+                    {profile ? (
+                      <Link href="/claim" className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                        🏅 Claim your NFT →
+                      </Link>
+                    ) : (
+                      <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register to claim →</button>
+                    )}
+                  </>
+                ) : userRank > 0 ? (
+                  <>
+                    <span>
+                      You&apos;re ranked <strong>#{userRank}</strong> on {chain.label} out of {rows.length} users
+                      {userRow && (
+                        <> · Score: <strong>{fmt(userRow.activity_score)}</strong>
+                        {' '}({fmt(top30Score - userRow.activity_score)} pts to top 30)</>
+                      )}
+                    </span>
+                    {profile
+                      ? <span className={`${chain.color} text-xs`}>✓ <strong>{profile.name}</strong></span>
+                      : <button onClick={() => setShowRegister(true)} className="text-xs underline font-semibold hover:opacity-80">Register profile →</button>
+                    }
+                  </>
+                ) : (
+                  <span>
+                    <strong>{shortAddr(address)}</strong> has no activity on {chain.label} yet.
+                  </span>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Stats grid */}
-      {!loading && rows.length > 0 && (() => {
-        const totalNative = rows.reduce((s, r) => s + r.native_tx_count, 0)
-        const totalToken = rows.reduce((s, r) => s + r.token_tx_count, 0)
-        const totalVolume = rows.reduce((s, r) => s + r.total_token_volume_usd, 0)
-        const totalContracts = rows.reduce((s, r) => s + r.contracts_deployed, 0)
-        const totalTxns = totalNative + totalToken
-        const avgScore = Math.round(rows.reduce((s, r) => s + r.activity_score, 0) / rows.length)
-        const activeBuilders = rows.filter(r => r.contracts_deployed > 0).length
-        const heavyUsers = rows.filter(r => r.native_tx_count + r.token_tx_count >= 10).length
-
-        const stats = [
-          {
-            label: 'Tracked Wallets',
-            value: fmt(rows.length),
-            sub: `${fmt(activeBuilders)} deployed contracts`,
-            icon: '👥',
-            color: 'text-white',
-          },
-          {
-            label: 'Total Transactions',
-            value: fmt(totalTxns),
-            sub: `${fmt(heavyUsers)} power users (10+ txns)`,
-            icon: '⚡',
-            color: 'text-yellow-400',
-          },
-          {
-            label: 'Native ETH Txns',
-            value: fmt(totalNative),
-            sub: `avg ${fmt(Math.round(totalNative / rows.length))} per wallet`,
-            icon: '🔁',
-            color: 'text-blue-400',
-          },
-          {
-            label: 'ERC-20 Token Txns',
-            value: fmt(totalToken),
-            sub: `avg ${fmt(Math.round(totalToken / rows.length))} per wallet`,
-            icon: '🪙',
-            color: 'text-purple-400',
-          },
-          {
-            label: 'ERC-20 Volume (USD)',
-            value: fmtUsd(totalVolume),
-            sub: `avg ${fmtUsd(Math.round(totalVolume / rows.length))} per wallet`,
-            icon: '💸',
-            color: 'text-emerald-400',
-          },
-          {
-            label: 'Contracts Deployed',
-            value: fmt(totalContracts),
-            sub: `${fmt(activeBuilders)} unique builders`,
-            icon: '📜',
-            color: 'text-orange-400',
-          },
-          {
-            label: 'Top Score',
-            value: fmt(rows[0]?.activity_score ?? 0),
-            sub: `avg score ${fmt(avgScore)}`,
-            icon: '🏆',
-            color: 'text-amber-400',
-          },
-          {
-            label: 'Top 30 Cutoff',
-            value: fmt(rows[TOP_N - 1]?.activity_score ?? 0),
-            sub: `${fmt(rows.length - TOP_N)} wallets outside top 30`,
-            icon: '🎯',
-            color: 'text-pink-400',
-          },
-        ]
-
-        return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {stats.map(s => (
-              <div key={s.label} className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800 flex flex-col gap-1">
-                <div className="text-gray-500 text-xs flex items-center gap-1">
-                  <span>{s.icon}</span> {s.label}
+            {userRank > TOP_N && userRow && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>Progress to top 30 on {chain.label}</span>
+                  <span>{fmt(userRow.activity_score)} / {fmt(top30Score)} pts</span>
                 </div>
-                <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-                <div className="text-gray-600 text-xs">{s.sub}</div>
+                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (userRow.activity_score / top30Score) * 100).toFixed(1)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stats grid */}
+        {!loading && rows.length > 0 && (() => {
+          const totalNative = rows.reduce((s, r) => s + r.native_tx_count, 0)
+          const totalToken = rows.reduce((s, r) => s + r.token_tx_count, 0)
+          const totalVolume = rows.reduce((s, r) => s + r.total_token_volume_usd, 0)
+          const totalContracts = rows.reduce((s, r) => s + r.contracts_deployed, 0)
+          const totalTxns = totalNative + totalToken
+          const avgScore = Math.round(rows.reduce((s, r) => s + r.activity_score, 0) / rows.length)
+          const activeBuilders = rows.filter(r => r.contracts_deployed > 0).length
+          const heavyUsers = rows.filter(r => r.native_tx_count + r.token_tx_count >= 10).length
+
+          const stats = [
+            { label: 'Tracked Wallets', value: fmt(rows.length), sub: `${fmt(activeBuilders)} deployed contracts`, icon: '👥', color: 'text-white' },
+            { label: 'Total Transactions', value: fmt(totalTxns), sub: `${fmt(heavyUsers)} power users (10+ txns)`, icon: '⚡', color: 'text-yellow-400' },
+            { label: 'Native Txns', value: fmt(totalNative), sub: `avg ${fmt(Math.round(totalNative / rows.length))} per wallet`, icon: '🔁', color: 'text-blue-400' },
+            { label: 'ERC-20 Token Txns', value: fmt(totalToken), sub: `avg ${fmt(Math.round(totalToken / rows.length))} per wallet`, icon: '🪙', color: 'text-purple-400' },
+            { label: 'ERC-20 Volume (USD)', value: fmtUsd(totalVolume), sub: `avg ${fmtUsd(Math.round(totalVolume / rows.length))} per wallet`, icon: '💸', color: 'text-emerald-400' },
+            { label: 'Contracts Deployed', value: fmt(totalContracts), sub: `${fmt(activeBuilders)} unique builders`, icon: '📜', color: 'text-orange-400' },
+            { label: 'Top Score', value: fmt(rows[0]?.activity_score ?? 0), sub: `avg score ${fmt(avgScore)}`, icon: '🏆', color: 'text-amber-400' },
+            { label: 'Top 30 Cutoff', value: fmt(rows[TOP_N - 1]?.activity_score ?? 0), sub: `${fmt(rows.length - TOP_N)} wallets outside top 30`, icon: '🎯', color: 'text-pink-400' },
+          ]
+
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {stats.map(s => (
+                <div key={s.label} className="bg-gray-900 rounded-xl px-4 py-3 border border-gray-800 flex flex-col gap-1">
+                  <div className="text-gray-500 text-xs flex items-center gap-1">
+                    <span>{s.icon}</span> {s.label}
+                  </div>
+                  <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+                  <div className="text-gray-600 text-xs">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* How scoring works */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-gray-300 mb-3">How scoring works</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { icon: '🔁', label: 'Native transaction', pts: '1 pt each', desc: 'Any native transfer' },
+              { icon: '🪙', label: 'Token transfer', pts: '2 pts each', desc: 'ERC-20 token transactions' },
+              { icon: '💵', label: 'Token volume', pts: '1 pt / $100', desc: 'USD value of tokens moved' },
+              { icon: '📜', label: 'Contract deployed', pts: '3 pts each', desc: 'Smart contracts deployed' },
+            ].map(item => (
+              <div key={item.label} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-xs font-semibold text-white">{item.pts}</span>
+                </div>
+                <div className="text-xs text-gray-400">{item.label}</div>
+                <div className="text-xs text-gray-600">{item.desc}</div>
               </div>
             ))}
           </div>
-        )
-      })()}
-
-      {/* How scoring works */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-gray-300 mb-3">How scoring works</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: '🔁', label: 'Native transaction', pts: '1 pt each', desc: 'Any ETH transfer on Base' },
-            { icon: '🪙', label: 'Token transfer', pts: '2 pts each', desc: 'ERC-20 token transactions' },
-            { icon: '💵', label: 'Token volume', pts: '1 pt / $100', desc: 'USD value of tokens moved' },
-            { icon: '📜', label: 'Contract deployed', pts: '3 pts each', desc: 'Smart contracts deployed' },
-          ].map(item => (
-            <div key={item.label} className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{item.icon}</span>
-                <span className="text-xs font-semibold text-white">{item.pts}</span>
-              </div>
-              <div className="text-xs text-gray-400">{item.label}</div>
-              <div className="text-xs text-gray-600">{item.desc}</div>
-            </div>
-          ))}
+          <p className="text-xs text-gray-600 mt-3 border-t border-gray-800 pt-3">
+            Timeframe: all-time · Chain: <span className={chain.color}>{chain.label}</span> · Data source: Dune Analytics
+          </p>
         </div>
-        <p className="text-xs text-gray-600 mt-3 border-t border-gray-800 pt-3">
-          Timeframe: all-time · Chain: Base (Chain ID 8453) · Data source: Dune Analytics
-        </p>
-      </div>
 
-      {/* Search */}
-      <div className="flex gap-3 items-center">
-        <input
-          type="text"
-          placeholder="Search by wallet address..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="text-xs text-gray-500 hover:text-gray-300">
-            Clear
-          </button>
-        )}
-        <span className="text-xs text-gray-600 whitespace-nowrap">
-          {filtered.length} / {rows.length} users
-        </span>
-      </div>
+        {/* Search */}
+        <div className="flex gap-3 items-center">
+          <input
+            type="text"
+            placeholder={`Search by wallet address on ${chain.label}…`}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="flex-1 bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-600"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="text-xs text-gray-500 hover:text-gray-300">Clear</button>
+          )}
+          <span className="text-xs text-gray-600 whitespace-nowrap">{filtered.length} / {rows.length} users</span>
+        </div>
 
-      {/* Leaderboard table */}
-      {loading ? (
-        <div className="text-center text-gray-500 py-20">Loading leaderboard…</div>
-      ) : error ? (
-        <div className="text-center text-red-400 py-20">{error}</div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-800">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-400 text-xs uppercase tracking-wide border-b border-gray-800 bg-gray-900">
-                <th className="px-4 py-3 text-left w-10">#</th>
-                <th className="px-4 py-3 text-left">Address</th>
-                <th className="px-4 py-3 text-right">Score ↓</th>
-                <th className="px-4 py-3 text-right hidden sm:table-cell">Native Txns</th>
-                <th className="px-4 py-3 text-right hidden sm:table-cell">Token Txns</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Volume (USD)</th>
-                <th className="px-4 py-3 text-right hidden md:table-cell">Contracts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => {
-                const i = rows.indexOf(row)
-                const isMe = address && row.address.toLowerCase() === address.toLowerCase()
-                const inTop30 = i < TOP_N
-                const pctOfFirst = (row.activity_score / firstScore) * 100
+        {/* Leaderboard table */}
+        {loading ? (
+          <div className="text-center text-gray-500 py-20">Loading {chain.label} leaderboard…</div>
+        ) : error ? (
+          <div className="text-center text-red-400 py-20">{error}</div>
+        ) : !chain.queryId ? (
+          <div className="text-center text-gray-600 py-20">
+            <div className="text-4xl mb-3">🔜</div>
+            <div className="text-gray-500 font-medium">{chain.label} query coming soon</div>
+            <div className="text-gray-700 text-sm mt-1">The Dune query for this chain is being set up</div>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-center text-gray-600 py-20">No activity found on {chain.label}</div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-400 text-xs uppercase tracking-wide border-b border-gray-800 bg-gray-900">
+                  <th className="px-4 py-3 text-left w-10">#</th>
+                  <th className="px-4 py-3 text-left">Address</th>
+                  <th className="px-4 py-3 text-right">Score ↓</th>
+                  <th className="px-4 py-3 text-right hidden sm:table-cell">Native Txns</th>
+                  <th className="px-4 py-3 text-right hidden sm:table-cell">Token Txns</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Volume (USD)</th>
+                  <th className="px-4 py-3 text-right hidden md:table-cell">Contracts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => {
+                  const i = rows.indexOf(row)
+                  const isMe = address && row.address.toLowerCase() === address.toLowerCase()
+                  const inTop30 = i < TOP_N
+                  const pctOfFirst = (row.activity_score / firstScore) * 100
 
-                return (
-                  <tr
-                    key={row.address}
-                    className={`border-b border-gray-800 last:border-0 transition-colors ${
-                      isMe ? 'bg-blue-950/60' : inTop30 ? 'bg-gray-900/60' : 'hover:bg-gray-900/40'
-                    }`}
-                  >
-                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      <a
-                        href={`https://basescan.org/address/${row.address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        {shortAddr(row.address)}
-                      </a>
-                      {isMe && <span className="ml-2 text-blue-400 text-xs">(you)</span>}
-                      {inTop30 && (
-                        <span className="ml-2 text-xs text-emerald-600">top 30</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex flex-col items-end gap-1">
-                        <div
-                          className="relative cursor-help"
-                          onMouseEnter={() => setHoveredScore(row.address)}
-                          onMouseLeave={() => setHoveredScore(null)}
+                  return (
+                    <tr
+                      key={row.address}
+                      className={`border-b border-gray-800 last:border-0 transition-colors ${
+                        isMe ? 'bg-blue-950/60' : inTop30 ? 'bg-gray-900/60' : 'hover:bg-gray-900/40'
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        <a
+                          href={`${chain.explorer}${row.address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`${chain.color} hover:opacity-80`}
                         >
-                          <span className="font-semibold">{fmt(row.activity_score)}</span>
-                          {hoveredScore === row.address && <ScoreTooltip row={row} />}
-                        </div>
-                        <div className="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
+                          {shortAddr(row.address)}
+                        </a>
+                        {isMe && <span className="ml-2 text-blue-400 text-xs">(you)</span>}
+                        {inTop30 && <span className="ml-2 text-xs text-emerald-600">top 30</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex flex-col items-end gap-1">
                           <div
-                            className="h-full bg-blue-600 rounded-full"
-                            style={{ width: `${pctOfFirst.toFixed(1)}%` }}
-                          />
+                            className="relative cursor-help"
+                            onMouseEnter={() => setHoveredScore(row.address)}
+                            onMouseLeave={() => setHoveredScore(null)}
+                          >
+                            <span className="font-semibold">{fmt(row.activity_score)}</span>
+                            {hoveredScore === row.address && <ScoreTooltip row={row} />}
+                          </div>
+                          <div className="w-16 h-1 bg-gray-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-600 rounded-full"
+                              style={{ width: `${pctOfFirst.toFixed(1)}%` }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.native_tx_count)}</td>
-                    <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.token_tx_count)}</td>
-                    <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{fmtUsd(row.total_token_volume_usd)}</td>
-                    <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{row.contracts_deployed}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <footer className="text-center text-gray-600 text-xs pt-2 flex flex-col gap-1">
-        <div>
-          Built by{' '}
-          <a href="https://ethcali.org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">ETH Cali</a>
-          {' · '}Data via{' '}
-          <a href="https://dune.com/ethcali" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Dune Analytics</a>
-          {' · '}
-          <a href="https://warpcast.com/ethereumcali.eth" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Farcaster</a>
-          {' · '}
-          <a href="https://twitter.com/ethcali_org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Twitter</a>
-        </div>
-        {lastUpdated && (
-          <div className="text-gray-700">Last data refresh: {new Date(lastUpdated).toUTCString()}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.native_tx_count)}</td>
+                      <td className="px-4 py-3 text-right text-gray-300 hidden sm:table-cell">{fmt(row.token_tx_count)}</td>
+                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{fmtUsd(row.total_token_volume_usd)}</td>
+                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">{row.contracts_deployed}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </footer>
-    </main>
+
+        <footer className="text-center text-gray-600 text-xs pt-2 flex flex-col gap-1">
+          <div>
+            Built by{' '}
+            <a href="https://ethcali.org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">ETH Cali</a>
+            {' · '}Data via{' '}
+            <a href="https://dune.com/ethcali" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Dune Analytics</a>
+            {' · '}
+            <a href="https://warpcast.com/ethereumcali.eth" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Farcaster</a>
+            {' · '}
+            <a href="https://twitter.com/ethcali_org" className="underline hover:text-gray-400" target="_blank" rel="noopener noreferrer">Twitter</a>
+          </div>
+          {lastUpdated && (
+            <div className="text-gray-700">Last data refresh: {new Date(lastUpdated).toUTCString()}</div>
+          )}
+        </footer>
+      </main>
     </>
   )
 }
