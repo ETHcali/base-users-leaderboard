@@ -14,13 +14,13 @@ const CHAINS: Record<string, { label: string; logo: string }> = {
 }
 const CHAIN_OPTIONS = Object.keys(CHAINS)
 
-type PoapSource = { id: number; event_id: number; name: string; chain: string; created_at: string; holder_count: number; last_synced_at: string | null }
-type NftSource  = { id: number; address: string; chain: string; name: string; created_at: string; holder_count: number; last_synced_at: string | null }
+type PoapSource = { id: number; event_id: number; name: string; chain: string; created_at: string; holder_count: number; last_synced_at: string | null; event_date: string | null }
+type NftSource  = { id: number; address: string; chain: string; name: string; created_at: string; holder_count: number; last_synced_at: string | null; event_date: string | null }
 type UnifiedRow =
   | (PoapSource & { kind: 'poap' })
   | (NftSource  & { kind: 'nft' })
 
-type EditState = { name: string; chain: string }
+type EditState = { name: string; chain: string; event_date: string }
 
 type SyncResult = {
   total: number
@@ -65,6 +65,7 @@ export default function SourcesPage() {
   const [newPoapId, setNewPoapId] = useState('')
   const [newPoapName, setNewPoapName] = useState('')
   const [newPoapChain, setNewPoapChain] = useState('gnosis')
+  const [newPoapDate, setNewPoapDate] = useState('')
   const [addingPoap, setAddingPoap] = useState(false)
   const [poapError, setPoapError] = useState<string | null>(null)
 
@@ -72,6 +73,7 @@ export default function SourcesPage() {
   const [newNftAddr, setNewNftAddr] = useState('')
   const [newNftChain, setNewNftChain] = useState('base')
   const [newNftName, setNewNftName] = useState('')
+  const [newNftDate, setNewNftDate] = useState('')
   const [addingNft, setAddingNft] = useState(false)
   const [nftError, setNftError] = useState<string | null>(null)
 
@@ -111,11 +113,11 @@ export default function SourcesPage() {
     if (!newPoapName.trim()) return setPoapError('Name is required.')
     setAddingPoap(true)
     const { error } = await supabase.from('poap_sources').upsert(
-      { event_id: eventId, name: newPoapName.trim(), chain: newPoapChain }, { onConflict: 'event_id' }
+      { event_id: eventId, name: newPoapName.trim(), chain: newPoapChain, event_date: newPoapDate || null }, { onConflict: 'event_id' }
     )
     setAddingPoap(false)
     if (error) return setPoapError(error.message)
-    setNewPoapId(''); setNewPoapName(''); setNewPoapChain('gnosis'); setPanel('none')
+    setNewPoapId(''); setNewPoapName(''); setNewPoapChain('gnosis'); setNewPoapDate(''); setPanel('none')
     loadSources()
   }
 
@@ -125,27 +127,28 @@ export default function SourcesPage() {
     if (!newNftName.trim()) return setNftError('Name is required.')
     setAddingNft(true)
     const { error } = await supabase.from('nft_sources').upsert(
-      { address: newNftAddr.toLowerCase(), chain: newNftChain, name: newNftName.trim() }, { onConflict: 'address' }
+      { address: newNftAddr.toLowerCase(), chain: newNftChain, name: newNftName.trim(), event_date: newNftDate || null }, { onConflict: 'address' }
     )
     setAddingNft(false)
     if (error) return setNftError(error.message)
-    setNewNftAddr(''); setNewNftName(''); setNewNftChain('base'); setPanel('none')
+    setNewNftAddr(''); setNewNftName(''); setNewNftChain('base'); setNewNftDate(''); setPanel('none')
     loadSources()
   }
 
   function startEdit(row: UnifiedRow) {
     const key = row.kind === 'poap' ? `poap-${row.event_id}` : `nft-${row.address}`
     setEditingRow(key)
-    setEditState({ name: row.name, chain: row.chain })
+    setEditState({ name: row.name, chain: row.chain, event_date: row.event_date ?? '' })
   }
 
   async function saveEdit(row: UnifiedRow) {
     if (!editState.name.trim()) return
     setSaving(true)
+    const patch = { name: editState.name.trim(), chain: editState.chain, event_date: editState.event_date || null }
     if (row.kind === 'poap') {
-      await supabase.from('poap_sources').update({ name: editState.name.trim(), chain: editState.chain }).eq('id', row.id)
+      await supabase.from('poap_sources').update(patch).eq('id', row.id)
     } else {
-      await supabase.from('nft_sources').update({ name: editState.name.trim(), chain: editState.chain }).eq('id', row.id)
+      await supabase.from('nft_sources').update(patch).eq('id', row.id)
     }
     setSaving(false)
     setEditingRow(null)
@@ -263,6 +266,10 @@ export default function SourcesPage() {
               <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Event name *</label>
               <input value={newPoapName} onChange={e => setNewPoapName(e.target.value)} placeholder="ETH Cali Workshop 2025" className={inputCls} />
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Event date</label>
+              <input type="date" value={newPoapDate} onChange={e => setNewPoapDate(e.target.value)} className={`${inputCls} w-36`} />
+            </div>
             <div className="flex gap-2">
               <button type="submit" disabled={addingPoap} className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-widest px-5 py-2.5 transition-all">
                 {addingPoap ? '…' : 'Add'}
@@ -292,6 +299,10 @@ export default function SourcesPage() {
             <div className="flex flex-col gap-1 flex-1 min-w-40">
               <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Name *</label>
               <input value={newNftName} onChange={e => setNewNftName(e.target.value)} placeholder="Event name" className={inputCls} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-[family-name:var(--font-body)] text-[#908f9d] uppercase tracking-widest">Event date</label>
+              <input type="date" value={newNftDate} onChange={e => setNewNftDate(e.target.value)} className={`${inputCls} w-36`} />
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={addingNft} className="cyber-gradient disabled:opacity-40 text-[#0e0e0f] font-[family-name:var(--font-body)] font-bold text-xs uppercase tracking-widest px-5 py-2.5 transition-all">
@@ -398,13 +409,21 @@ export default function SourcesPage() {
                       </select>
                     </td>
                     <td className="px-3 py-2"><TypeBadge kind={row.kind} /></td>
-                    <td className="px-3 py-2" colSpan={2}>
+                    <td className="px-3 py-2">
                       <input
                         value={editState.name}
                         onChange={e => setEditState(s => ({ ...s, name: e.target.value }))}
                         onKeyDown={e => { if (e.key === 'Enter') saveEdit(row); if (e.key === 'Escape') setEditingRow(null) }}
                         autoFocus
                         className="w-full bg-transparent border-b border-[#c0c1ff]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-1 px-0 focus:outline-none"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="date"
+                        value={editState.event_date}
+                        onChange={e => setEditState(s => ({ ...s, event_date: e.target.value }))}
+                        className="bg-transparent border-b border-[#c0c1ff]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-1 px-0 focus:outline-none w-32"
                       />
                     </td>
                     <td className="px-3 py-2 text-right text-[#464652]">{row.holder_count > 0 ? row.holder_count.toLocaleString() : '—'}</td>

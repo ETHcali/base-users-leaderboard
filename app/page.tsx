@@ -11,6 +11,25 @@ import { supabase, type UserProfile } from '@/lib/supabase'
 const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
 const TOP_N = 30
 
+const CHAIN_META: Record<string, { label: string; logo: string }> = {
+  base:     { label: 'Base',     logo: '/chains/base logo.svg' },
+  optimism: { label: 'Optimism', logo: '/chains/op mainnet.png' },
+  polygon:  { label: 'Polygon',  logo: '/chains/polygon.png' },
+  ethereum: { label: 'Ethereum', logo: '/chains/ethereum.png' },
+  unichain: { label: 'Unichain', logo: '/chains/unichain.png' },
+  gnosis:   { label: 'Gnosis',   logo: '/chains/gnosis.png' },
+}
+
+type SourceItem = {
+  kind: 'poap' | 'nft'
+  name: string
+  chain: string
+  holder_count: number
+  event_date: string | null
+  id_label: string   // event ID for POAP, short address for NFT
+  id_link: string
+}
+
 type ChainKey = 'all' | 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
 
 const CHAINS = [
@@ -63,6 +82,7 @@ export default function Home() {
   const [showRegister, setShowRegister] = useState(false)
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(30)
+  const [sources, setSources] = useState<SourceItem[]>([])
 
   async function fetchChain(key: string) {
     const cfg = CHAINS.find(c => c.key === key)
@@ -86,6 +106,42 @@ export default function Home() {
 
   useEffect(() => {
     CHAINS.forEach(c => { if (c.queryId) fetchChain(c.key) })
+
+    async function loadSources() {
+      const [{ data: poaps }, { data: nfts }] = await Promise.all([
+        supabase.from('poap_sources').select('event_id, name, chain, holder_count, event_date').order('event_date', { ascending: false }),
+        supabase.from('nft_sources').select('address, name, chain, holder_count, event_date').order('event_date', { ascending: false }),
+      ])
+      const items: SourceItem[] = [
+        ...(poaps ?? []).map(p => ({
+          kind: 'poap' as const,
+          name: p.name,
+          chain: p.chain ?? 'gnosis',
+          holder_count: p.holder_count ?? 0,
+          event_date: p.event_date ?? null,
+          id_label: `#${p.event_id}`,
+          id_link: `https://poap.gallery/drops/${p.event_id}`,
+        })),
+        ...(nfts ?? []).map(n => ({
+          kind: 'nft' as const,
+          name: n.name,
+          chain: n.chain,
+          holder_count: n.holder_count ?? 0,
+          event_date: n.event_date ?? null,
+          id_label: `${n.address.slice(0, 6)}…${n.address.slice(-4)}`,
+          id_link: `https://${n.chain === 'ethereum' ? 'eth' : n.chain}.blockscout.com/address/${n.address}`,
+        })),
+      ]
+      // Sort: dated items first (desc), then undated
+      items.sort((a, b) => {
+        if (a.event_date && b.event_date) return b.event_date.localeCompare(a.event_date)
+        if (a.event_date) return -1
+        if (b.event_date) return 1
+        return 0
+      })
+      setSources(items)
+    }
+    loadSources()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -419,6 +475,63 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* ── SOURCES ── */}
+        {sources.length > 0 && (
+          <section>
+            <div className="flex items-end justify-between pb-3 border-b border-[#464652]/20 mb-4">
+              <div>
+                <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-[0.25em] mb-1">// dataset_sources</p>
+                <h2 className="font-headline text-sm text-[#c0c1ff] uppercase tracking-[0.25em]" style={{ textShadow: '0 0 12px rgba(192,193,255,0.4)' }}>
+                  Events &amp; Collections
+                </h2>
+              </div>
+              <span className="font-label text-[10px] text-[#464652] uppercase tracking-widest">
+                {sources.filter(s => s.kind === 'poap').length} POAPs · {sources.filter(s => s.kind === 'nft').length} NFTs · {sources.reduce((s, r) => s + r.holder_count, 0).toLocaleString()} total holders
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {sources.map((src, i) => {
+                const chain = CHAIN_META[src.chain]
+                return (
+                  <div key={i} className="bg-[#1c1b1c] border border-[#464652]/15 p-4 flex items-start gap-3 hover:bg-[#201f20] transition-colors group">
+                    {/* Chain logo */}
+                    {chain && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={chain.logo} alt={chain.label} className="w-7 h-7 object-contain mt-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`font-label text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-widest border ${
+                          src.kind === 'poap'
+                            ? 'border-[#c0c1ff]/20 text-[#c0c1ff]'
+                            : 'border-[#464652]/40 text-[#908f9d]'
+                        }`}>{src.kind}</span>
+                        {src.event_date && (
+                          <span className="font-label text-[9px] text-[#464652] uppercase tracking-widest">
+                            {new Date(src.event_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-body text-xs text-[#e5e2e3] leading-snug truncate" title={src.name}>{src.name}</p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <a href={src.id_link} target="_blank" rel="noopener noreferrer"
+                          className="font-label text-[9px] text-[#464652] hover:text-[#c0c1ff] transition-colors uppercase tracking-widest">
+                          {src.id_label}
+                        </a>
+                        {src.holder_count > 0 && (
+                          <span className="font-headline text-xs font-bold text-[#c0c1ff]">
+                            {src.holder_count.toLocaleString()} <span className="font-label text-[9px] font-normal text-[#464652]">holders</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ── SCORE FORMULA ── */}
         <section className="border border-[#464652]/15 bg-[#1c1b1c] p-6">
