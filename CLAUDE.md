@@ -1,71 +1,129 @@
 @AGENTS.md
 
-# ETH Cali — Multi-Chain Activity Leaderboard
+# ETH Cali — Multi-Chain Activity Leaderboard · Maintainer Reference
 
-## Project overview
+## Project summary
 
 Onchain activity leaderboard for wallets onboarded by [ETH Cali](https://ethcali.org), a Colombian Web3 education community. Users connect their wallet to see their rank across 6 chains and check eligibility for the ETH Cali OG NFT (top 30 on Base).
 
-Live: https://web-5dwc86s2h-ekinoxis-team.vercel.app  
-Repo: https://github.com/ETHcali/base-users-leaderboard  
-Dune Dashboard: https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-ethcali
+**Live:** https://web-5dwc86s2h-ekinoxis-team.vercel.app  
+**Repo:** https://github.com/ETHcali/base-users-leaderboard  
+**Dune Dashboard:** https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-ethcali  
+**Supabase project ID:** `eqiqsaobvijyfbegzsqd`
+
+---
 
 ## Stack
 
 - **Next.js 16** (App Router) + **Tailwind CSS 4**
-- **wagmi v2** + **RainbowKit v2** — wallet connect (any wallet, Base network)
-- **Dune Analytics API** — multi-chain leaderboard data (6 chain queries)
-- **Supabase** — user registrations, dataset sources, wallet address dataset
+- **wagmi v2** + **RainbowKit v2** — wallet connect (Base network)
+- **Dune Analytics API** — multi-chain leaderboard data (6 queries, one per chain)
+- **Supabase** — user registrations, POAP/NFT sources, wallet dataset
 - **POAP API** — fetch holders per event ID
-- **Blockscout REST API** — fetch NFT holders per contract (multi-chain)
+- **Blockscout REST API** — fetch NFT holders per contract
 - **Vercel** — hosting, auto-deploy on push to `main`
 
-> ⚠️ RainbowKit 2 requires wagmi v2 (`^2.9.0`). Do NOT upgrade wagmi to v3 — it breaks the peer dependency.
+> ⚠️ RainbowKit 2 requires wagmi v2 (`^2.9.0`). Do NOT upgrade wagmi to v3.
+
+---
+
+## Available MCP tools — use these before writing code
+
+These are available as MCP tools in the Claude Code session. Using them avoids round-trips that waste tokens.
+
+### Supabase MCP (`mcp__claude_ai_Supabase__*`)
+Run SQL, apply migrations, inspect schema — without leaving the session.
+- `execute_sql` — run any SQL query against project `eqiqsaobvijyfbegzsqd`
+- `list_tables` — inspect schema
+- `apply_migration` — apply a migration file
+- `get_logs` — check recent Supabase logs
+
+**When to use:** Adding columns, checking if a migration ran, verifying row data, debugging query results.
+
+### Dune MCP (`mcp__dune__*`)
+Query and manage Dune Analytics programmatically.
+- `executeQueryById` — run a saved query and get results
+- `getExecutionResults` — fetch results of a previous execution
+- `getDuneQuery` — inspect a query's SQL
+- `updateDuneQuery` — edit query SQL
+- `searchTables` — discover available Dune tables
+
+**When to use:** Checking live leaderboard data, verifying query output, updating SQL templates.
+
+### Blockscout MCP (`mcp__blockscout__*`)
+Multichain blockchain data — no API key needed.
+- `get_address_info` — wallet overview (balance, tx count)
+- `get_transactions_by_address` — tx history with filters
+- `get_token_transfers_by_address` — ERC-20 transfers
+- `get_tokens_by_address` — token holdings
+- `nft_tokens_by_address` — NFT holdings
+- `get_contract_abi` / `inspect_contract_code` — contract inspection
+- `direct_api_call` — any Blockscout API endpoint
+
+**Chain IDs:** Ethereum=1, Base=8453, Optimism=10, Polygon=137, Gnosis=100, Unichain=1301  
+**When to use:** Verifying holder counts, checking wallet activity, debugging sync results.
+
+### blockscout-analysis skill
+Invoked via `/blockscout-analysis`. Provides structured blockchain analysis workflow — use when the task involves interpreting on-chain patterns across multiple wallets or chains.
+
+---
+
+## App routes
+
+| Route | Audience | Description |
+|-------|----------|-------------|
+| `/` | Public | Multi-chain leaderboard — chain tabs, sortable table, wallet connect, register flow |
+| `/sources` | Public | All POAP events + NFT contracts in the dataset, filterable by type and chain |
+| `/about` | Public | Score formula explanation, metric definitions |
+| `/profile` | Connected wallet | Wallet profile — registration data, per-chain metrics, inline OG NFT claim for Base top 30 |
+| `/claim` | Connected wallet | Legacy claim page — still exists but claim is now embedded in `/profile` |
+| `/admin` | Admin | Redirects to `/admin/dashboard` |
+| `/admin/dashboard` | Admin | Dataset KPIs + per-chain Dune stats + Run Sync button |
+| `/admin/sources` | Admin | Add/remove POAP event IDs and NFT contracts, trigger sync |
+| `/admin/dataset` | Admin | Browse all unique wallet addresses, export CSV |
+| `/admin/users` | Admin | Registered users with Dune data, filter by top 30 |
+| `/admin/top30` | Admin | Dune top 30 × registered users × dataset — NFT mint reconciliation |
+| `/api/sync` | Server (POST) | Fetch all POAP + NFT holders server-side, upsert into dataset_addresses |
+
+---
 
 ## Key files
 
 | File | Purpose |
 |------|---------|
-| `app/page.tsx` | Main leaderboard — chain tabs, Dune fetch, wallet check, 8-metric stats grid, registration flow |
-| `app/claim/page.tsx` | Claim page — top-30 eligibility check, onchain metrics card, OG NFT claim submit |
-| `app/admin/layout.tsx` | Shared admin shell — single auth gate (sessionStorage) + sidebar nav |
-| `app/admin/dashboard/page.tsx` | Admin overview — dataset KPI cards + per-chain Dune stats + Run Sync |
-| `app/admin/sources/page.tsx` | Sources manager — unified POAP/NFT table with chain logos, filters, add/remove, inline edit, per-row sync |
-| `app/admin/dataset/page.tsx` | Dataset browser — paginated unique addresses, search, CSV export |
-| `app/admin/users/page.tsx` | Registered users — Dune-enriched table, Top-30 filter, CSV export |
-| `app/admin/top30/page.tsx` | Top-30 reconciliation — Dune rank joined with users + dataset, mailto claim button |
-| `app/api/sync/route.ts` | POST /api/sync — server-side: fetches POAP + Blockscout holders, upserts to dataset_addresses |
+| `app/components/Navbar.tsx` | **Shared navbar** — desktop header + mobile header + mobile bottom nav. Uses `usePathname()` for active state. Edit once, applies everywhere. |
 | `app/components/RegisterModal.tsx` | Registration modal — name, email, X, Telegram, WhatsApp, country |
+| `app/page.tsx` | Main leaderboard — chain tabs, Dune fetch, sortable table, wallet connect |
+| `app/sources/page.tsx` | Public sources page — POAP/NFT grid with filters |
+| `app/about/page.tsx` | Score formula + metric definitions |
+| `app/profile/page.tsx` | User profile + per-chain metrics + inline OG NFT claim |
+| `app/admin/layout.tsx` | Admin shell — auth gate (sessionStorage) + sidebar nav |
+| `app/admin/dashboard/page.tsx` | Admin overview — KPI cards + per-chain stats + Run Sync |
+| `app/admin/sources/page.tsx` | Sources CRUD — unified POAP/NFT table, inline edit, per-row sync |
+| `app/admin/dataset/page.tsx` | Dataset browser — paginated addresses, search, CSV export |
+| `app/admin/users/page.tsx` | Registered users — Dune-enriched table, Top-30 filter, CSV export |
+| `app/admin/top30/page.tsx` | Top-30 reconciliation — rank × users × dataset, mailto claim |
+| `app/api/sync/route.ts` | POST /api/sync — server-side POAP + Blockscout holder fetch + upsert |
 | `app/providers.tsx` | WagmiProvider + RainbowKitProvider + QueryClientProvider |
-| `app/layout.tsx` | Root layout, metadata, favicon (ETH Cali branding PNG) |
+| `app/layout.tsx` | Root layout — fonts, metadata, favicon, suppressHydrationWarning on `<html>` |
 | `lib/supabase.ts` | Supabase client + UserProfile type |
-| `scripts/sync-dataset.mjs` | CLI equivalent of /api/sync — run with `npm run sync-dataset`, outputs public/dataset.csv |
-| `public/branding/` | ETH Cali logos — favicon, claim page hero |
-| `public/chains/` | Chain logos: base, ethereum, gnosis, optimism, polygon, unichain |
-| `public/nfts and poaps distributed - Sheet1.csv` | Source CSV of all ETH Cali events (canonical reference) |
-| `docsdune/queries/` | SQL templates for each chain — paste into Dune to create/update queries |
-| `docsdune/` | Dune CLI, MCP, and query pattern reference docs |
-| `docspoap/` | POAP API endpoint reference docs |
-| `supabase/migrations/` | SQL migration history |
+| `supabase/migrations/` | SQL migration history — run via Supabase MCP, not manually |
+| `docsdune/queries/` | SQL templates for each chain query |
 
-## App routes
+---
 
-| Route | Who | Description |
-|-------|-----|-------------|
-| `/` | Public | Multi-chain leaderboard with chain tabs, wallet connect, register flow |
-| `/claim` | Connected wallet | Eligibility check + OG NFT claim |
-| `/admin` | Admin | Redirects to `/admin/dashboard` |
-| `/admin/dashboard` | Admin | Dataset KPIs + per-chain Dune stats (wallets, top score, total txns) |
-| `/admin/sources` | Admin | Add/remove POAP event IDs and NFT contracts, trigger sync |
-| `/admin/dataset` | Admin | Browse all unique wallet addresses, export CSV |
-| `/admin/users` | Admin | All registered users with Dune data, filter by top 30 |
-| `/admin/top30` | Admin | Dune top 30 × registered users × dataset — operational NFT mint screen |
-| `/api/sync` | Server (POST) | Fetch all POAP + NFT holders server-side, upsert into dataset_addresses |
+## Component architecture rules
+
+- **Never duplicate nav markup.** All public pages use `<Navbar />` from `app/components/Navbar.tsx`. Active state is automatic via `usePathname()`.
+- **Nav items:** Leaderboard · Sources · About · Profile (no Terminal, no Claim link — admin accessed directly at `/admin/dashboard`).
+- **Mobile bottom nav:** same 4 items, same component.
+- Adding a new public page = add one entry to `NAV_ITEMS` in `Navbar.tsx`.
+
+---
 
 ## Dune data
 
-- **Dataset**: `dune.ethcali.dataset_users_onboarded_eth_cali` — wallet addresses fed from Supabase `dataset_addresses`
-- **Query SQL templates**: `docsdune/queries/{chain}.sql` — source SQL for each chain query
+**Dataset table:** `dune.ethcali.dataset_users_onboarded_eth_cali` — fed from Supabase `dataset_addresses`
 
 | Chain | Env var | Query ID |
 |-------|---------|----------|
@@ -76,19 +134,26 @@ Dune Dashboard: https://dune.com/ethcali/onchain-metrics-by-users-onboarded-by-e
 | Gnosis | `NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS` | [7346996](https://dune.com/queries/7346996) |
 | Unichain | `NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN` | [7346997](https://dune.com/queries/7346997) |
 
-### Score formula (same for all chains)
-
+### Score formula (all chains)
 ```
 score = (native_tx_count × 1) + (token_tx_count × 2) + (total_token_volume_usd / 100) + (contracts_deployed × 3)
 ```
 
-## Dataset sync flow
+### Dune row shape (all chain queries return same columns)
+```typescript
+type Row = {
+  address: string
+  native_tx_count: number
+  token_tx_count: number
+  total_token_volume_usd: number
+  contracts_deployed: number
+  activity_score: number
+  first_tx_time: string | null
+  last_tx_time: string | null
+}
+```
 
-1. Admin adds POAP event IDs to `poap_sources` and NFT contracts to `nft_sources` via `/admin/sources`
-2. Admin clicks **Run Sync** → calls `POST /api/sync` (server-side to avoid CORS)
-3. Server fetches all holders from POAP API (`/event/{id}/poaps`, paginated 300/page) and Blockscout (`/api/v2/tokens/{address}/holders`, cursor-paginated)
-4. All addresses are deduplicated and upserted into `dataset_addresses`
-5. Admin exports CSV from `/admin/dataset` and uploads to Dune to refresh the leaderboard dataset
+---
 
 ## Supabase schema
 
@@ -104,81 +169,119 @@ score = (native_tx_count × 1) + (token_tx_count × 2) + (total_token_volume_usd
 | `country_code` | TEXT | optional |
 | `registered_at` | TIMESTAMPTZ | |
 
-### `poap_sources` — POAP event IDs to sync
+### `poap_sources`
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | BIGINT PK | auto |
 | `event_id` | INTEGER UNIQUE | POAP drop ID |
 | `name` | TEXT | event label |
-| `chain` | TEXT | default `gnosis` (POAP protocol chain) |
+| `chain` | TEXT | default `gnosis` |
 | `holder_count` | INTEGER | updated on sync |
-| `last_synced_at` | TIMESTAMPTZ | updated on sync |
-| `created_at` | TIMESTAMPTZ | |
+| `event_date` | DATE | optional |
+| `last_synced_at` | TIMESTAMPTZ | |
 
-### `nft_sources` — NFT contracts to sync
+### `nft_sources`
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | BIGINT PK | auto |
 | `address` | TEXT UNIQUE | lowercase contract address |
 | `chain` | TEXT | base / optimism / polygon / ethereum / unichain |
 | `name` | TEXT | event label |
 | `holder_count` | INTEGER | updated on sync |
-| `last_synced_at` | TIMESTAMPTZ | updated on sync |
-| `created_at` | TIMESTAMPTZ | |
+| `event_date` | DATE | optional |
+| `last_synced_at` | TIMESTAMPTZ | |
 
-### `dataset_addresses` — deduplicated wallet set
+### `dataset_addresses`
 | Column | Type | Notes |
 |--------|------|-------|
 | `address` | TEXT PK | lowercase |
 | `updated_at` | TIMESTAMPTZ | last sync timestamp |
 
+**Migration workflow:** Write SQL in `supabase/migrations/`, then apply via Supabase MCP `execute_sql` tool (project `eqiqsaobvijyfbegzsqd`). Never run migrations manually.
+
+---
+
+## Design system
+
+Dark sci-fi aesthetic. Key color tokens:
+
+| Token | Value | Use |
+|-------|-------|-----|
+| Background | `#131314` | page bg |
+| Surface | `#1c1b1c` | cards, panels |
+| Surface low | `#0e0e0f` | deeper panels |
+| Border | `#464652` | borders (use `/15`–`/30` opacity) |
+| Text primary | `#e5e2e3` | data values, headings |
+| Text secondary | `#908f9d` | labels, metadata |
+| Accent | `#c0c1ff` | active states, scores, highlights |
+| Accent dark | `#2e3192` | gradients, backgrounds |
+
+**Contrast rule:** Labels use `text-[#908f9d]`, data values use `text-[#e5e2e3]`, accent/interactive use `text-[#c0c1ff]`. Never use `text-[#464652]` for readable text — it's near-invisible on the dark background (border use only).
+
+**Fonts:**
+- `font-headline` → Plus Jakarta Sans (bold display)
+- `font-body` → Space Grotesk (readable text)
+- `font-label` → uppercase tracking-widest micro-labels
+- `font-mono` → wallet addresses, code
+
+---
+
+## Dataset sync flow
+
+1. Admin adds POAP event IDs / NFT contracts via `/admin/sources`
+2. Admin clicks **Run Sync** → `POST /api/sync` (server-side to avoid CORS)
+3. Server fetches POAP API (`/event/{id}/poaps`, paginated 300/page) and Blockscout (`/api/v2/tokens/{address}/holders`)
+4. Addresses deduplicated → upserted into `dataset_addresses`
+5. Admin exports CSV from `/admin/dataset` → uploads to Dune to refresh the dataset
+
+---
+
+## Blockscout chain URLs
+
+| Chain | Blockscout URL |
+|-------|---------------|
+| Base | https://base.blockscout.com |
+| Optimism | https://optimism.blockscout.com |
+| Polygon | https://polygon.blockscout.com |
+| Ethereum | https://eth.blockscout.com |
+| Unichain | https://unichain.blockscout.com |
+
+POAPs use Gnosis chain but are fetched via POAP API, not Blockscout.
+
+---
+
 ## Environment variables
 
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `NEXT_PUBLIC_DUNE_API_KEY` | `.env.local` + Vercel | Dune API access |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_BASE` | `.env.local` + Vercel | Dune query ID for Base leaderboard (6634911) |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM` | `.env.local` + Vercel | Dune query ID for Ethereum leaderboard (7347012) |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM` | `.env.local` + Vercel | Dune query ID for Optimism leaderboard (7346993) |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON` | `.env.local` + Vercel | Dune query ID for Polygon leaderboard (7346995) |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS` | `.env.local` + Vercel | Dune query ID for Gnosis leaderboard (7346996) |
-| `NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN` | `.env.local` + Vercel | Dune query ID for Unichain leaderboard (7346997) |
-| `NEXT_PUBLIC_SUPABASE_URL` | `.env.local` + Vercel | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `.env.local` + Vercel | Supabase anon key |
-| `NEXT_PUBLIC_ADMIN_PASSWORD` | `.env.local` + Vercel | Admin panel password (sessionStorage-cached) |
-| `NEXT_PUBLIC_POAP_API_KEY` | `.env.local` + Vercel | POAP API key (used server-side in /api/sync) |
-| `ETHERSCAN_API_KEY` | `.env.local` + Vercel | Etherscan API key — fallback NFT holder sync when Blockscout fails |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | `.env.local` + Vercel | WalletConnect project ID |
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_DUNE_API_KEY` | Dune API access |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_BASE` | 6634911 |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_ETHEREUM` | 7347012 |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_OPTIMISM` | 7346993 |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_POLYGON` | 7346995 |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_GNOSIS` | 7346996 |
+| `NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN` | 7346997 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `NEXT_PUBLIC_ADMIN_PASSWORD` | Admin panel password (sessionStorage-cached) |
+| `NEXT_PUBLIC_POAP_API_KEY` | POAP API key (server-side sync) |
+| `ETHERSCAN_API_KEY` | Fallback NFT sync when Blockscout fails |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect cloud |
 
-## Blockscout chains
-
-| Chain | Blockscout base URL |
-|-------|-------------------|
-| base | https://base.blockscout.com |
-| optimism | https://optimism.blockscout.com |
-| polygon | https://polygon.blockscout.com |
-| ethereum | https://eth.blockscout.com |
-| unichain | https://unichain.blockscout.com |
-
-POAPs always use Gnosis chain (POAP protocol) but are fetched via POAP API, not Blockscout.
+---
 
 ## Roadmap
 
-- [x] Base Network leaderboard with activity scoring
-- [x] Multi-chain leaderboard — chain tab selector (Base, Ethereum, Optimism, Polygon, Gnosis, Unichain)
-- [x] 6 Dune queries created and live (one per chain), SQL templates in `docsdune/queries/`
-- [x] 8-metric dashboard stats grid (live from Dune, updates per selected chain)
-- [x] Admin dashboard — per-chain Dune stats cards (wallets, top score, total txns)
-- [x] Wallet connect + top-30 eligibility check
-- [x] User registration (name, email, X, Telegram, WhatsApp, country) via Supabase
-- [x] /claim page — top-30 users see metrics card + submit OG NFT claim
-- [x] ETH Cali branding favicon
-- [x] Admin panel rebuilt as sidebar shell with 5 pages
-- [x] Dataset sources manager — unified POAP/NFT table, chain logos, type + chain filters, inline edit, per-row sync, holder counts
-- [x] Server-side dataset sync (POAP API + Blockscout, CORS-safe)
-- [x] 17 POAP events + 16 NFT contracts seeded from event history CSV
-- [x] Dataset browser — paginated address table, search, CSV export
-- [x] Top-30 reconciliation page — rank × registered users × dataset, mailto claim button
-- [ ] ERC-721 OG NFT contract on Base — mint to top 30 on-chain
+- [x] Multi-chain leaderboard — Base, Ethereum, Optimism, Polygon, Gnosis, Unichain
+- [x] Sortable table (click any column header)
+- [x] Wallet connect + top-30 eligibility
+- [x] User registration via Supabase
+- [x] Shared `<Navbar />` component — active state via `usePathname()`
+- [x] `/sources` — public POAP/NFT source browser with filters
+- [x] `/about` — score formula + metric definitions
+- [x] `/profile` — per-chain metrics + inline OG NFT claim (Base top 30)
+- [x] Admin panel — dashboard, sources, dataset, users, top30
+- [x] Server-side dataset sync (POAP + Blockscout)
+- [x] Sources manager — unified table, inline edit, per-row sync, event dates
+- [x] Total volume metric in admin dashboard
+- [ ] ERC-721 OG NFT contract on Base — on-chain mint for top 30
 - [ ] Merkle whitelist script — reads top 30 from Dune, updates contract allowlist
-- [ ] Automate dataset sync on schedule (cron via Vercel or GitHub Actions)
+- [ ] Automate dataset sync (Vercel cron / GitHub Actions)
