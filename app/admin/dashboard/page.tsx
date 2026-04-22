@@ -15,11 +15,17 @@ const CHAINS = [
   { key: 'unichain', label: 'Unichain', logo: '/chains/unichain.png',   queryId: process.env.NEXT_PUBLIC_DUNE_QUERY_ID_UNICHAIN ?? '' },
 ]
 
-type ChainStats = { wallets: number; topScore: number; totalTxns: number; lastUpdated: string }
+type ChainStats = { wallets: number; topScore: number; totalTxns: number; totalVolume: number; lastUpdated: string }
 type Stat = { label: string; value: number; sub?: string; sym: string; href?: string }
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)
+}
+
+function fmtUsd(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
+  return `$${fmt(n)}`
 }
 
 export default function DashboardPage() {
@@ -43,19 +49,28 @@ export default function DashboardPage() {
       { count: datasetCount },
       { count: usersCount },
       { data: lastAddr },
+      { data: poapHolders },
+      { data: nftHolders },
     ] = await Promise.all([
       supabase.from('poap_sources').select('*', { count: 'exact', head: true }),
       supabase.from('nft_sources').select('*', { count: 'exact', head: true }),
       supabase.from('dataset_addresses').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('dataset_addresses').select('updated_at').order('updated_at', { ascending: false }).limit(1),
+      supabase.from('poap_sources').select('holder_count'),
+      supabase.from('nft_sources').select('holder_count'),
     ])
     setLastSync(lastAddr?.[0]?.updated_at ?? null)
+    const totalHolders = [
+      ...(poapHolders ?? []),
+      ...(nftHolders ?? []),
+    ].reduce((s, r) => s + (r.holder_count ?? 0), 0)
     setStats([
       { label: 'POAP Events',      value: poapCount ?? 0,    sym: '◉', href: '/admin/sources', sub: 'tracked events' },
       { label: 'NFT Contracts',    value: nftCount ?? 0,     sym: '⬡', href: '/admin/sources', sub: 'on-chain sources' },
       { label: 'Unique Addresses', value: datasetCount ?? 0, sym: '◈', href: '/admin/dataset', sub: 'in dataset' },
       { label: 'Registered Users', value: usersCount ?? 0,   sym: '◇', href: '/admin/users',   sub: 'filled the form' },
+      { label: 'Total Holders',    value: totalHolders,      sym: '◎', href: '/admin/sources', sub: 'across all sources' },
     ])
     setLoading(false)
     loadAllChains()
@@ -74,13 +89,15 @@ export default function DashboardPage() {
           { headers: { 'X-Dune-API-Key': DUNE_API_KEY } }
         )
         const data = await res.json()
-        const rows: { native_tx_count: number; token_tx_count: number; activity_score: number }[] = data?.result?.rows ?? []
+        const rows: { native_tx_count: number; token_tx_count: number; total_token_volume_usd: number; activity_score: number }[] = data?.result?.rows ?? []
+        rows.sort((a, b) => b.activity_score - a.activity_score)
         setChainStats(prev => ({
           ...prev,
           [c.key]: {
             wallets: rows.length,
             topScore: rows[0]?.activity_score ?? 0,
-            totalTxns: rows.reduce((s, r) => s + r.native_tx_count + r.token_tx_count, 0),
+            totalTxns: rows.reduce((s, r) => s + (r.native_tx_count ?? 0) + (r.token_tx_count ?? 0), 0),
+            totalVolume: rows.reduce((s, r) => s + (r.total_token_volume_usd ?? 0), 0),
             lastUpdated: data?.execution_ended_at ?? '',
           },
         }))
@@ -117,7 +134,7 @@ export default function DashboardPage() {
             System <br /><span className="text-[#c0c1ff]">Reconciliation</span>
           </h1>
           {lastSync && (
-            <p className="font-[family-name:var(--font-body)] text-[10px] text-[#464652] uppercase tracking-wider mt-3">
+            <p className="font-[family-name:var(--font-body)] text-[10px] text-[#908f9d] uppercase tracking-wider mt-3">
               Last sync: {new Date(lastSync).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
@@ -141,9 +158,9 @@ export default function DashboardPage() {
 
       {/* Dataset KPI cards */}
       <section>
-        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-[0.25em] mb-4">// Dataset Nodes</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {loading ? Array.from({ length: 4 }).map((_, i) => (
+        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-[0.25em] mb-4">// Dataset Nodes</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {loading ? Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="bg-[#1c1b1c] border border-[#464652]/15 p-6 h-28 animate-pulse" />
           )) : stats.map(s => (
             <Link
@@ -168,7 +185,7 @@ export default function DashboardPage() {
 
       {/* Per-chain stats */}
       <section>
-        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-[0.25em] mb-4">// Multi-Chain Event Matrix</p>
+        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-[0.25em] mb-4">// Multi-Chain Event Matrix</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {CHAINS.map(c => {
             const cs = chainStats[c.key]
@@ -188,14 +205,14 @@ export default function DashboardPage() {
                   <img src={c.logo} alt={c.label} className="w-6 h-6 object-contain" />
                   <span className="font-[family-name:var(--font-headline)] text-sm font-bold text-[#e5e2e3] uppercase tracking-widest">{c.label}</span>
                   {!hasQuery && (
-                    <span className="ml-auto font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-widest border border-[#464652]/30 px-2 py-0.5">soon</span>
+                    <span className="ml-auto font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-widest border border-[#464652]/30 px-2 py-0.5">soon</span>
                   )}
                 </div>
 
                 <div className="h-px w-full bg-[#464652]/20" />
 
                 {!hasQuery ? (
-                  <p className="font-[family-name:var(--font-body)] text-[10px] text-[#464652] leading-relaxed">
+                  <p className="font-[family-name:var(--font-body)] text-[10px] text-[#908f9d] leading-relaxed">
                     Set <code className="text-[#908f9d]">NEXT_PUBLIC_DUNE_QUERY_ID_{c.key.toUpperCase()}</code> env var.
                   </p>
                 ) : isLoading ? (
@@ -212,6 +229,7 @@ export default function DashboardPage() {
                       { label: 'Active wallets', value: fmt(cs.wallets) },
                       { label: 'Top score',      value: fmt(cs.topScore), accent: true },
                       { label: 'Total txns',     value: fmt(cs.totalTxns) },
+                      { label: 'Total volume',   value: fmtUsd(cs.totalVolume) },
                     ].map(row => (
                       <div key={row.label} className="flex justify-between items-center">
                         <span className="font-[family-name:var(--font-body)] text-[10px] text-[#908f9d] uppercase tracking-wider">{row.label}</span>
@@ -219,7 +237,7 @@ export default function DashboardPage() {
                       </div>
                     ))}
                     {cs.lastUpdated && (
-                      <p className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-wider pt-2 border-t border-[#464652]/15">
+                      <p className="font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-wider pt-2 border-t border-[#464652]/15">
                         Updated {new Date(cs.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     )}
@@ -233,7 +251,7 @@ export default function DashboardPage() {
 
       {/* Quick links */}
       <section>
-        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#464652] uppercase tracking-[0.25em] mb-4">// Control Actions</p>
+        <p className="font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-[0.25em] mb-4">// Control Actions</p>
         <div className="grid grid-cols-2 gap-3">
           {[
             { href: '/admin/sources', sym: '⬡', label: 'Add POAP event or NFT contract' },

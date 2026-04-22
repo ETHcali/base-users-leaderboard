@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ETH Cali - Claim Identity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#353436",
+                        "on-primary": "#1e2084",
+                        "on-secondary": "#2b2d51",
+                        "surface-container": "#201f20",
+                        "on-secondary-fixed-variant": "#424369",
+                        "surface-container-low": "#1c1b1c",
+                        "tertiary-fixed": "#ffdbcb",
+                        "error-container": "#93000a",
+                        "surface-dim": "#131314",
+                        "surface-variant": "#353436",
+                        "primary-container": "#2e3192",
+                        "outline": "#908f9d",
+                        "surface-tint": "#c0c1ff",
+                        "secondary-container": "#424369",
+                        "tertiary": "#ffb692",
+                        "surface-container-high": "#2a2a2b",
+                        "surface": "#131314",
+                        "surface-container-lowest": "#0e0e0f",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#04006d",
+                        "on-tertiary-fixed": "#341100",
+                        "on-surface": "#e5e2e3",
+                        "on-error": "#690005",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "primary": "#c0c1ff",
+                        "secondary": "#c2c3f0",
+                        "inverse-primary": "#4f54b4",
+                        "primary-fixed": "#e1e0ff",
+                        "surface-bright": "#3a393a",
+                        "inverse-surface": "#e5e2e3",
+                        "error": "#ffb4ab",
+                        "tertiary-fixed-dim": "#ffb692",
+                        "on-primary-container": "#9da1ff",
+                        "tertiary-container": "#6c2a00",
+                        "on-background": "#e5e2e3",
+                        "on-secondary-container": "#b1b1dd",
+                        "on-surface-variant": "#c7c5d4",
+                        "on-tertiary": "#562000",
+                        "on-tertiary-fixed-variant": "#773207",
+                        "on-secondary-fixed": "#16183b",
+                        "inverse-on-surface": "#313031",
+                        "background": "#131314",
+                        "outline-variant": "#464652",
+                        "secondary-fixed": "#e1e0ff",
+                        "secondary-fixed-dim": "#c2c3f0",
+                        "on-tertiary-container": "#f19160",
+                        "on-primary-fixed-variant": "#373a9b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "0px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Plus Jakarta Sans", "sans-serif"],
+                        "body": ["Space Grotesk", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>body {
+    background-color: #131314;
+    color: #e5e2e3
+    }
+.ghost-border {
+    border: 1px solid rgba(70, 70, 82, 0.15)
+    }
+.electric-gradient {
+    background: linear-gradient(135deg, #2e3192, #c0c1ff)
+    }
+.glow-shadow {
+    box-shadow: 0 0 30px rgba(46, 49, 146, 0.1)
+    }
+.frosted-glass {
+    background: rgba(53, 52, 54, 0.6);
+    backdrop-filter: blur(20px)
+    }
+.geometric-bg {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBPWpcGbKO9lg7fQ4Fj9Nzl3MQDIrSXovjpm2oh19gl1vgBe65WzaK699cRtG_9Z2Hgmurxf9Nj83Y5OBn8fW53EhXHL7LR1agid_lhP1aTkn5DqJa8l3hvc6QGcS_xzX2hx1t_9YCltatcoCK_ps7DpZu2Z4EdcjFteUvY_jLa3a-u8BaeSf7aPi8Ww9uLADzL67Ga47BZzFNTUoSAeHdgJR5lfwIfp72gLVspszOHJz6aa06nNuaqu7-fuBiwODrOgsaWKxAT1MI);
+    background-size: cover;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    pointer-events: none
+    }
+/* TopAppBar Styles from JSON */
+.top-app-bar-bg {
+    @apply bg- [#131314]dark: bg- [#131314];
+    }
+.top-app-bar-primary {
+    @apply text- [#C0C1FF];
+    }
+.top-app-bar-typography {
+    @apply font-headline font-bold tracking- [0.2em]uppercase;
+    }
+.top-app-bar-logo {
+    @apply text-xl font-bold text- [#E5E2E3]tracking-widest;
+    }
+.top-app-bar-shape {
+    @apply rounded-none w-full top-0 sticky z-50;
+    }
+.top-app-bar-separation {
+    @apply bg-gradient-to-b from- [#131314]to- [#0E0E0F];
+    }
+.top-app-bar-shadow {
+    @apply shadow- [0_10px_30px_-15px_rgba (46, 49, 146, 0.2)];
+    }
+.top-app-bar-layout {
+    @apply flex justify-between items-center w-full px-6 py-4 max-w-full;
+    }
+.top-app-bar-icon-hover {
+    @apply hover: bg- [#2E3192]/20 hover: text- [#C0C1FF]transition-all duration-300;
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body min-h-screen flex flex-col relative overflow-x-hidden">
+<!-- Background Overlay -->
+<div class="fixed inset-0 geometric-bg z-0" data-alt="Subtle sacred geometry lines and intersecting circles forming an ethereal dark background grid pattern"></div>
+<!-- TopAppBar -->
+<header class="top-app-bar-bg top-app-bar-shape top-app-bar-separation top-app-bar-shadow relative z-50">
+<div class="top-app-bar-layout">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 top-app-bar-primary flex items-center justify-center top-app-bar-icon-hover cursor-pointer">
+<span class="material-symbols-outlined text-3xl">diamond</span>
+</div>
+<span class="top-app-bar-typography top-app-bar-logo">ETH CALI</span>
+</div>
+<button aria-label="Settings" class="w-10 h-10 top-app-bar-primary flex items-center justify-center top-app-bar-icon-hover cursor-pointer">
+<span class="material-symbols-outlined text-2xl">settings_ethernet</span>
+</button>
+</div>
+</header>
+<main class="flex-grow container mx-auto px-6 py-12 lg:py-24 relative z-10 flex flex-col lg:flex-row gap-12 lg:gap-24 items-start">
+<!-- Left Column: Tactical ID -->
+<section class="w-full lg:w-5/12 flex flex-col gap-8">
+<div class="flex flex-col gap-2">
+<h1 class="font-headline text-4xl lg:text-5xl font-extrabold tracking-tight text-on-surface">IDENTITY <br/><span class="text-primary">VERIFICATION</span></h1>
+<p class="text-on-surface-variant text-sm font-label uppercase tracking-widest mt-2">Initialize your cypher profile.</p>
+</div>
+<!-- Sacred Data Block: ID Card -->
+<div class="relative bg-surface-container-low ghost-border p-8 overflow-hidden glow-shadow group">
+<!-- Watermark -->
+<div class="absolute -right-20 -bottom-20 w-96 h-96 opacity-10 pointer-events-none transition-transform duration-1000 group-hover:scale-105" data-alt="Large faint Ethereum diamond geometric outline acting as a watermark" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD3sH8t0-Q5vOpA1q5qQs4tiJfSZjvb-xFYJ_baORaKhw8PoKqrp0Pb6ew9PUlSvdfVT4icXJ-CTdHBl9MCOhBzUmEH7iw7BmGqzIXxbCl8GclyzDB8ZFgzlGyCKFfnjU1xv2qlH9Nr82HcJEQSAs0uKFvuJ7eZLtbSyu_nnm-nLVA2qRvtUZKIGZMC4uZ7ouCo3LPfB2NVm5nfVqB4Axei-e4v4kVDHyPp6Kt4G3cTdWpk9py5IlAEq6n6VJ6j4Sh2449_C3hsdjY'); background-size: contain; background-repeat: no-repeat;"></div>
+<!-- Verified Badge -->
+<div class="absolute top-4 right-4 flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label text-xs tracking-widest uppercase font-bold">Unclaimed</span>
+</div>
+<div class="flex flex-col gap-8 relative z-10">
+<div class="flex items-center gap-6">
+<div class="w-20 h-20 bg-surface-container-highest flex items-center justify-center ghost-border shadow-inner">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant">person_outline</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label text-xs text-outline uppercase tracking-wider mb-1">Target Address</span>
+<span class="font-body text-lg text-on-surface break-all">0x71C...976F</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-px bg-outline-variant/15 p-px">
+<!-- Stat Block -->
+<div class="bg-surface-container-low p-4 flex flex-col gap-1">
+<span class="font-label text-[10px] text-primary uppercase tracking-widest">Native Txns</span>
+<span class="font-headline text-xl font-bold text-on-surface">1,204</span>
+</div>
+<div class="bg-surface-container-low p-4 flex flex-col gap-1">
+<span class="font-label text-[10px] text-primary uppercase tracking-widest">Volume (ETH)</span>
+<span class="font-headline text-xl font-bold text-on-surface">84.5</span>
+</div>
+<div class="bg-surface-container-low p-4 flex flex-col gap-1">
+<span class="font-label text-[10px] text-primary uppercase tracking-widest">Age (Days)</span>
+<span class="font-headline text-xl font-bold text-on-surface">492</span>
+</div>
+<div class="bg-surface-container-low p-4 flex flex-col gap-1">
+<span class="font-label text-[10px] text-primary uppercase tracking-widest">Trust Score</span>
+<span class="font-headline text-xl font-bold text-on-surface">89/100</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Registration Form -->
+<section class="w-full lg:w-7/12 mt-8 lg:mt-0">
+<div class="frosted-glass ghost-border p-8 lg:p-12">
+<form class="flex flex-col gap-10">
+<div class="flex flex-col gap-2">
+<h2 class="font-headline text-2xl font-bold text-on-surface tracking-wide uppercase">Claim Parameters</h2>
+<div class="h-px w-16 bg-primary-container"></div>
+</div>
+<div class="flex flex-col gap-8">
+<!-- Input Group -->
+<div class="relative group">
+<input class="w-full bg-transparent border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-on-surface font-body text-lg py-3 px-0 transition-colors placeholder-transparent peer" id="alias" placeholder="Alias" type="text"/>
+<label class="absolute left-0 top-3 text-outline text-sm font-label tracking-wider transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-primary peer-focus:font-bold peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-xs uppercase" for="alias">Alias</label>
+</div>
+<!-- Input Group -->
+<div class="relative group">
+<input class="w-full bg-transparent border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-on-surface font-body text-lg py-3 px-0 transition-colors placeholder-transparent peer" id="email" placeholder="Encrypted Comms (Email)" type="email"/>
+<label class="absolute left-0 top-3 text-outline text-sm font-label tracking-wider transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-primary peer-focus:font-bold peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-xs uppercase" for="email">Encrypted Comms (Email)</label>
+</div>
+<!-- Input Group -->
+<div class="relative group">
+<input class="w-full bg-transparent border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-on-surface font-body text-lg py-3 px-0 transition-colors placeholder-transparent peer" id="x_handle" placeholder="X / Twitter Handle" type="text"/>
+<label class="absolute left-0 top-3 text-outline text-sm font-label tracking-wider transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-primary peer-focus:font-bold peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-xs uppercase" for="x_handle">X (Twitter) Handle</label>
+</div>
+<!-- Input Group -->
+<div class="relative group">
+<input class="w-full bg-transparent border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-on-surface font-body text-lg py-3 px-0 transition-colors placeholder-transparent peer" id="telegram" placeholder="Telegram ID" type="text"/>
+<label class="absolute left-0 top-3 text-outline text-sm font-label tracking-wider transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-primary peer-focus:font-bold peer-[:not(:placeholder-shown)]:-top-4 peer-[:not(:placeholder-shown)]:text-xs uppercase" for="telegram">Telegram ID</label>
+</div>
+</div>
+<div class="mt-4">
+<button class="w-full electric-gradient text-surface-container-lowest font-headline font-bold text-lg uppercase tracking-[0.2em] py-5 px-8 hover:shadow-[0_0_30px_rgba(46,49,146,0.6)] transition-all duration-300 flex items-center justify-center gap-3" type="button">
+<span class="material-symbols-outlined">fingerprint</span>
+                            INITIATE_CLAIM
+                        </button>
+</div>
+</form>
+</div>
+</section>
+</main>
+<!-- Suppressed BottomNavBar due to Transactional/Onboarding intent of this screen -->
+</body></html>

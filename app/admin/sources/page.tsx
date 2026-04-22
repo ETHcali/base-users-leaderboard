@@ -85,7 +85,7 @@ export default function SourcesPage() {
 
   // inline edit
   const [editingRow, setEditingRow] = useState<string | null>(null) // 'poap-{id}' or 'nft-{addr}'
-  const [editState, setEditState] = useState<EditState>({ name: '', chain: '' })
+  const [editState, setEditState] = useState<EditState>({ name: '', chain: '', event_date: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { loadSources(); loadDatasetCount() }, [])
@@ -374,7 +374,7 @@ export default function SourcesPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-[#0e0e0f] border-b border-[#464652]/20 text-left">
-              {['Chain', 'Type', 'Name', 'ID / Address', 'Holders', 'Last sync', ''].map(h => (
+              {['Chain', 'Type', 'Name', 'Event date', 'ID / Address', 'Holders', 'Last sync', ''].map(h => (
                 <th key={h} className={`px-4 py-3 font-[family-name:var(--font-body)] text-[9px] text-[#908f9d] uppercase tracking-widest ${h === 'Holders' || h === 'Last sync' ? 'text-right' : ''}`}>{h}</th>
               ))}
             </tr>
@@ -383,14 +383,14 @@ export default function SourcesPage() {
             {loadingData ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i} className="border-b border-[#464652]/10">
-                  <td colSpan={7} className="px-4 py-3">
+                  <td colSpan={8} className="px-4 py-3">
                     <div className="h-4 bg-[#201f20] animate-pulse w-full" />
                   </td>
                 </tr>
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-16 font-[family-name:var(--font-body)] text-[#464652] text-xs uppercase tracking-widest">
+                <td colSpan={8} className="text-center py-16 font-[family-name:var(--font-body)] text-[#464652] text-xs uppercase tracking-widest">
                   No sources match this filter.{' '}
                   <button onClick={() => { setTypeFilter('all'); setChainFilter('all') }} className="text-[#c0c1ff] hover:underline">Clear</button>
                 </td>
@@ -426,6 +426,7 @@ export default function SourcesPage() {
                         className="bg-transparent border-b border-[#c0c1ff]/40 text-[#e5e2e3] font-[family-name:var(--font-body)] text-xs py-1 px-0 focus:outline-none w-32"
                       />
                     </td>
+                    <td className="px-3 py-2 text-[#464652] font-mono text-[10px]">—</td>
                     <td className="px-3 py-2 text-right text-[#464652]">{row.holder_count > 0 ? row.holder_count.toLocaleString() : '—'}</td>
                     <td className="px-3 py-2" />
                     <td className="px-3 py-2 text-right">
@@ -448,13 +449,18 @@ export default function SourcesPage() {
                   <td className="px-4 py-3"><ChainBadge chain={row.chain} /></td>
                   <td className="px-4 py-3"><TypeBadge kind={row.kind} /></td>
                   <td className="px-4 py-3 text-[#e5e2e3] font-[family-name:var(--font-body)] max-w-xs truncate" title={row.name}>{row.name}</td>
+                  <td className="px-4 py-3 text-[#908f9d] text-xs whitespace-nowrap font-[family-name:var(--font-body)]">
+                    {row.event_date
+                      ? new Date(row.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : <span className="text-[#464652]">—</span>}
+                  </td>
                   <td className="px-4 py-3 font-mono">
                     {row.kind === 'poap' ? (
                       <a href={`https://poap.gallery/drops/${row.event_id}`} target="_blank" rel="noopener noreferrer" className="text-[#c0c1ff] hover:underline">
                         #{row.event_id}
                       </a>
                     ) : (
-                      <a href={`https://${row.chain === 'ethereum' ? 'eth' : row.chain}.blockscout.com/address/${row.address}`} target="_blank" rel="noopener noreferrer" className="text-[#908f9d] hover:text-[#c0c1ff] transition-colors">
+                      <a href={`https://${row.chain === 'ethereum' ? 'eth' : row.chain}.blockscout.com/address/${row.address}`} target="_blank" rel="noopener noreferrer" className="text-[#e5e2e3] hover:text-[#c0c1ff] transition-colors font-mono">
                         {row.address.slice(0, 8)}…{row.address.slice(-6)}
                       </a>
                     )}

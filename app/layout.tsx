@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${spaceGrotesk.variable} h-full`}>
+    <html lang="en" className={`${plusJakarta.variable} ${spaceGrotesk.variable} h-full`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col sacred-bg text-[#e5e2e3] antialiased">
         <Providers>{children}</Providers>
       </body>

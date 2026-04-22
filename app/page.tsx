@@ -1,34 +1,14 @@
 'use client'
 
-import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
 import { useEffect, useState, useMemo } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { RegisterModal } from './components/RegisterModal'
+import { Navbar } from './components/Navbar'
 import { supabase, type UserProfile } from '@/lib/supabase'
 
 const DUNE_API_KEY = process.env.NEXT_PUBLIC_DUNE_API_KEY ?? ''
 const TOP_N = 30
-
-const CHAIN_META: Record<string, { label: string; logo: string }> = {
-  base:     { label: 'Base',     logo: '/chains/base logo.svg' },
-  optimism: { label: 'Optimism', logo: '/chains/op mainnet.png' },
-  polygon:  { label: 'Polygon',  logo: '/chains/polygon.png' },
-  ethereum: { label: 'Ethereum', logo: '/chains/ethereum.png' },
-  unichain: { label: 'Unichain', logo: '/chains/unichain.png' },
-  gnosis:   { label: 'Gnosis',   logo: '/chains/gnosis.png' },
-}
-
-type SourceItem = {
-  kind: 'poap' | 'nft'
-  name: string
-  chain: string
-  holder_count: number
-  event_date: string | null
-  id_label: string   // event ID for POAP, short address for NFT
-  id_link: string
-}
 
 type ChainKey = 'all' | 'base' | 'ethereum' | 'optimism' | 'polygon' | 'gnosis' | 'unichain'
 
@@ -82,7 +62,13 @@ export default function Home() {
   const [showRegister, setShowRegister] = useState(false)
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(30)
-  const [sources, setSources] = useState<SourceItem[]>([])
+  const [sortCol, setSortCol] = useState<keyof Row>('activity_score')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function toggleSort(col: keyof Row) {
+    if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
 
   async function fetchChain(key: string) {
     const cfg = CHAINS.find(c => c.key === key)
@@ -107,41 +93,6 @@ export default function Home() {
   useEffect(() => {
     CHAINS.forEach(c => { if (c.queryId) fetchChain(c.key) })
 
-    async function loadSources() {
-      const [{ data: poaps }, { data: nfts }] = await Promise.all([
-        supabase.from('poap_sources').select('event_id, name, chain, holder_count, event_date').order('event_date', { ascending: false }),
-        supabase.from('nft_sources').select('address, name, chain, holder_count, event_date').order('event_date', { ascending: false }),
-      ])
-      const items: SourceItem[] = [
-        ...(poaps ?? []).map(p => ({
-          kind: 'poap' as const,
-          name: p.name,
-          chain: p.chain ?? 'gnosis',
-          holder_count: p.holder_count ?? 0,
-          event_date: p.event_date ?? null,
-          id_label: `#${p.event_id}`,
-          id_link: `https://poap.gallery/drops/${p.event_id}`,
-        })),
-        ...(nfts ?? []).map(n => ({
-          kind: 'nft' as const,
-          name: n.name,
-          chain: n.chain,
-          holder_count: n.holder_count ?? 0,
-          event_date: n.event_date ?? null,
-          id_label: `${n.address.slice(0, 6)}…${n.address.slice(-4)}`,
-          id_link: `https://${n.chain === 'ethereum' ? 'eth' : n.chain}.blockscout.com/address/${n.address}`,
-        })),
-      ]
-      // Sort: dated items first (desc), then undated
-      items.sort((a, b) => {
-        if (a.event_date && b.event_date) return b.event_date.localeCompare(a.event_date)
-        if (a.event_date) return -1
-        if (b.event_date) return 1
-        return 0
-      })
-      setSources(items)
-    }
-    loadSources()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -194,7 +145,14 @@ export default function Home() {
   const totalContracts = activeRows.reduce((s, r) => s + r.contracts_deployed, 0)
   const totalTxns = activeRows.reduce((s, r) => s + r.native_tx_count + r.token_tx_count, 0)
 
-  const visibleRows = filtered.slice(0, visibleCount)
+  const sortedFiltered = (sortCol === 'activity_score' && sortDir === 'desc')
+    ? filtered
+    : [...filtered].sort((a, b) => {
+        const av = (a[sortCol] ?? 0) as number
+        const bv = (b[sortCol] ?? 0) as number
+        return sortDir === 'desc' ? bv - av : av - bv
+      })
+  const visibleRows = sortedFiltered.slice(0, visibleCount)
 
   return (
     <>
@@ -202,39 +160,11 @@ export default function Home() {
         <RegisterModal
           walletAddress={address}
           onClose={() => setShowRegister(false)}
-          onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/claim' }}
+          onSuccess={p => { setProfile(p); setShowRegister(false); window.location.href = '/profile' }}
         />
       )}
 
-      {/* ── HEADER (desktop) ── */}
-      <header className="hidden md:flex justify-between items-center w-full px-8 py-4 sticky top-0 z-50 bg-[#131314]/90 backdrop-blur-xl border-b border-[#464652]/20"
-        style={{ boxShadow: '0 10px 40px -10px rgba(46,49,146,0.2)' }}>
-        <div className="flex items-center gap-3">
-          <Image src="/branding/Open SEA - Ethereum Cali3.png" alt="ETH Cali" width={32} height={32} />
-          <span className="font-headline text-lg font-bold tracking-widest uppercase text-[#e5e2e3]">ETH CALI</span>
-        </div>
-        <nav className="flex gap-6 font-label text-xs uppercase tracking-widest">
-          <span className="text-[#c0c1ff] flex items-center gap-1.5" style={{ textShadow: '0 0 12px rgba(192,193,255,0.6)' }}>
-            <span>◈</span> Leaderboard
-          </span>
-          <Link href="/claim" className="text-[#e5e2e3]/40 hover:text-[#c0c1ff] transition-colors flex items-center gap-1.5">
-            <span>◇</span> Claim
-          </Link>
-          <Link href="/admin/dashboard" className="text-[#e5e2e3]/40 hover:text-[#c0c1ff] transition-colors flex items-center gap-1.5">
-            <span>◇</span> Terminal
-          </Link>
-        </nav>
-        <ConnectButton />
-      </header>
-
-      {/* ── HEADER (mobile) ── */}
-      <header className="md:hidden flex justify-between items-center px-5 py-4 sticky top-0 z-50 bg-[#131314]/90 backdrop-blur-xl border-b border-[#464652]/20">
-        <div className="flex items-center gap-2">
-          <Image src="/branding/Open SEA - Ethereum Cali3.png" alt="ETH Cali" width={28} height={28} />
-          <span className="font-headline text-base font-bold tracking-widest uppercase text-[#e5e2e3]">ETH CALI</span>
-        </div>
-        <ConnectButton />
-      </header>
+      <Navbar />
 
       <main className="flex-grow w-full max-w-7xl mx-auto px-4 md:px-8 py-10 space-y-10 pb-28 md:pb-10">
 
@@ -389,79 +319,70 @@ export default function Home() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="py-20 text-center">
-                <p className="font-label text-xs text-[#464652] uppercase tracking-widest">No operatives found</p>
+                <p className="font-label text-xs text-[#908f9d] uppercase tracking-widest">No operatives found</p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {visibleRows.map((row, i) => {
-                  const rank = activeRows.indexOf(row) + 1
-                  const isMe = address && row.address.toLowerCase() === address.toLowerCase()
-                  const inTop30 = rank <= TOP_N
-                  const isAlt = i % 2 === 0
-
-                  return (
-                    <div
-                      key={row.address}
-                      className={`flex items-center justify-between p-4 transition-all group border-l-2 ${
-                        isMe
-                          ? 'bg-[#2e3192]/15 border-[#c0c1ff]'
-                          : rank === 1
-                          ? 'bg-[#1c1b1c] border-[#c0c1ff] glow-blue'
-                          : inTop30
-                          ? `${isAlt ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'} border-transparent hover:border-[#464652]/40`
-                          : `${isAlt ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'} border-transparent hover:border-[#464652]/20`
-                      } hover:bg-[#201f20]`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className={`font-headline font-black text-lg w-10 tabular-nums ${
-                          rank <= 3 ? 'text-[#c0c1ff]' : 'text-[#464652]'
-                        }`} style={rank <= 3 ? { textShadow: '0 0 8px rgba(192,193,255,0.5)' } : {}}>
-                          #{String(rank).padStart(2, '0')}
-                        </span>
-                        <div className="w-9 h-9 bg-[#2a2a2b] border border-[#464652]/20 flex items-center justify-center shrink-0">
-                          <span className="text-[#c7c5d4]/60 text-xs">◈</span>
-                        </div>
-                        <div>
-                          <a
-                            href={`${explorerBase}${row.address}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-body text-sm text-[#e5e2e3] hover:text-[#c0c1ff] transition-colors"
-                          >
-                            {shortAddr(row.address)}
-                          </a>
-                          {isMe && <span className="ml-2 font-label text-[10px] text-[#c0c1ff] uppercase tracking-widest">you</span>}
-                          <p className="font-label text-[10px] text-[#c7c5d4]/50 mt-0.5">
-                            Score: {fmtScore(row.activity_score)}
-                            {inTop30 && <span className="ml-2 text-[#c0c1ff]/60">· top 30</span>}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right hidden lg:block">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Txns</p>
-                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.native_tx_count)}</p>
-                        </div>
-                        <div className="text-right hidden lg:block">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Token Txns</p>
-                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.token_tx_count)}</p>
-                        </div>
-                        <div className="text-right hidden md:block">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Volume</p>
-                          <p className="font-body text-sm text-[#e5e2e3]">{fmtUsd(row.total_token_volume_usd)}</p>
-                        </div>
-                        <div className="text-right hidden md:block">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Contracts</p>
-                          <p className="font-body text-sm text-[#e5e2e3]">{fmt(row.contracts_deployed)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-widest">Score</p>
-                          <p className="font-headline text-sm font-bold text-[#c0c1ff]">{fmtScore(row.activity_score)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[#464652]/20 text-left">
+                      <th className="pb-2 pr-4 w-12 font-label text-[9px] text-[#908f9d] uppercase tracking-widest">#</th>
+                      <th className="pb-2 pr-4 font-label text-[9px] text-[#908f9d] uppercase tracking-widest">Address</th>
+                      {([
+                        { key: 'native_tx_count',       label: 'Txns',       cls: '' },
+                        { key: 'token_tx_count',        label: 'Token Txns', cls: 'hidden sm:table-cell' },
+                        { key: 'total_token_volume_usd',label: 'Volume',     cls: 'hidden md:table-cell' },
+                        { key: 'contracts_deployed',    label: 'Contracts',  cls: 'hidden md:table-cell' },
+                        { key: 'activity_score',        label: 'Score',      cls: '' },
+                      ] as { key: keyof Row; label: string; cls: string }[]).map(col => (
+                        <th key={col.key} onClick={() => toggleSort(col.key)}
+                          className={`pb-2 px-2 text-right cursor-pointer select-none ${col.cls}`}>
+                          <span className={`font-label text-[9px] uppercase tracking-widest transition-colors ${sortCol === col.key ? 'text-[#c0c1ff]' : 'text-[#908f9d] hover:text-[#e5e2e3]'}`}>
+                            {col.label}{sortCol === col.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((row, i) => {
+                      const rank = activeRows.indexOf(row) + 1
+                      const isMe = address && row.address.toLowerCase() === address.toLowerCase()
+                      const inTop30 = rank <= TOP_N
+                      return (
+                        <tr key={row.address} className={`border-b border-[#464652]/10 last:border-0 hover:bg-[#201f20] transition-colors border-l-2 ${
+                          isMe ? 'bg-[#2e3192]/15 border-[#c0c1ff]' :
+                          rank === 1 ? 'bg-[#1c1b1c] border-[#c0c1ff] glow-blue' :
+                          `${i % 2 === 0 ? 'bg-[#1c1b1c]' : 'bg-[#0e0e0f]'} border-transparent`
+                        }`}>
+                          <td className="py-3 pr-4">
+                            <span className={`font-headline font-black tabular-nums ${rank <= 3 ? 'text-[#c0c1ff]' : 'text-[#908f9d]'}`}
+                              style={rank <= 3 ? { textShadow: '0 0 8px rgba(192,193,255,0.5)' } : {}}>
+                              #{String(rank).padStart(2, '0')}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <a href={`${explorerBase}${row.address}`} target="_blank" rel="noopener noreferrer"
+                                className="font-body text-sm text-[#e5e2e3] hover:text-[#c0c1ff] transition-colors">
+                                {shortAddr(row.address)}
+                              </a>
+                              {isMe && <span className="font-label text-[9px] text-[#c0c1ff] uppercase tracking-widest border border-[#c0c1ff]/30 px-1.5 py-0.5">you</span>}
+                              {inTop30 && !isMe && <span className="font-label text-[9px] text-[#c0c1ff]/40 uppercase">top30</span>}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-right font-body text-sm text-[#e5e2e3] tabular-nums">{fmt(row.native_tx_count)}</td>
+                          <td className="py-3 px-2 text-right font-body text-sm text-[#e5e2e3] hidden sm:table-cell tabular-nums">{fmt(row.token_tx_count)}</td>
+                          <td className="py-3 px-2 text-right font-body text-sm text-[#e5e2e3] hidden md:table-cell">{fmtUsd(row.total_token_volume_usd)}</td>
+                          <td className="py-3 px-2 text-right font-body text-sm text-[#e5e2e3] hidden md:table-cell tabular-nums">{fmt(row.contracts_deployed)}</td>
+                          <td className="py-3 pl-2 text-right">
+                            <span className="font-headline text-sm font-bold text-[#c0c1ff]">{fmtScore(row.activity_score)}</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
 
@@ -476,84 +397,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── SOURCES ── */}
-        {sources.length > 0 && (
-          <section>
-            <div className="flex items-end justify-between pb-3 border-b border-[#464652]/20 mb-4">
-              <div>
-                <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-[0.25em] mb-1">// dataset_sources</p>
-                <h2 className="font-headline text-sm text-[#c0c1ff] uppercase tracking-[0.25em]" style={{ textShadow: '0 0 12px rgba(192,193,255,0.4)' }}>
-                  Events &amp; Collections
-                </h2>
-              </div>
-              <span className="font-label text-[10px] text-[#464652] uppercase tracking-widest">
-                {sources.filter(s => s.kind === 'poap').length} POAPs · {sources.filter(s => s.kind === 'nft').length} NFTs · {sources.reduce((s, r) => s + r.holder_count, 0).toLocaleString()} total holders
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {sources.map((src, i) => {
-                const chain = CHAIN_META[src.chain]
-                return (
-                  <div key={i} className="bg-[#1c1b1c] border border-[#464652]/15 p-4 flex items-start gap-3 hover:bg-[#201f20] transition-colors group">
-                    {/* Chain logo */}
-                    {chain && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={chain.logo} alt={chain.label} className="w-7 h-7 object-contain mt-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`font-label text-[8px] font-bold px-1.5 py-0.5 uppercase tracking-widest border ${
-                          src.kind === 'poap'
-                            ? 'border-[#c0c1ff]/20 text-[#c0c1ff]'
-                            : 'border-[#464652]/40 text-[#908f9d]'
-                        }`}>{src.kind}</span>
-                        {src.event_date && (
-                          <span className="font-label text-[9px] text-[#464652] uppercase tracking-widest">
-                            {new Date(src.event_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-body text-xs text-[#e5e2e3] leading-snug truncate" title={src.name}>{src.name}</p>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <a href={src.id_link} target="_blank" rel="noopener noreferrer"
-                          className="font-label text-[9px] text-[#464652] hover:text-[#c0c1ff] transition-colors uppercase tracking-widest">
-                          {src.id_label}
-                        </a>
-                        {src.holder_count > 0 && (
-                          <span className="font-headline text-xs font-bold text-[#c0c1ff]">
-                            {src.holder_count.toLocaleString()} <span className="font-label text-[9px] font-normal text-[#464652]">holders</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* ── SCORE FORMULA ── */}
-        <section className="border border-[#464652]/15 bg-[#1c1b1c] p-6">
-          <p className="font-label text-[10px] text-[#c7c5d4]/40 uppercase tracking-[0.25em] mb-4">// Score Protocol</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { action: 'Native Transaction', pts: '1 pt each' },
-              { action: 'Token Transfer', pts: '2 pts each' },
-              { action: '$100 Token Volume', pts: '1 pt' },
-              { action: 'Contract Deployed', pts: '3 pts each' },
-            ].map(s => (
-              <div key={s.action} className="flex flex-col gap-1">
-                <p className="font-headline text-lg font-bold text-[#c0c1ff]">{s.pts}</p>
-                <p className="font-label text-[10px] text-[#c7c5d4]/50 uppercase tracking-widest">{s.action}</p>
-              </div>
-            ))}
-          </div>
-          <p className="font-label text-[10px] text-[#464652] uppercase tracking-widest mt-4 pt-4 border-t border-[#464652]/20">
-            Data: Dune Analytics · All-time · {activeChain === 'all' ? 'All EVM chains aggregated' : `Chain: ${CHAINS.find(c => c.key === activeChain)?.label ?? activeChain}`}
-          </p>
-        </section>
-
         {/* ── FOOTER ── */}
         <footer className="flex flex-col sm:flex-row justify-between items-center gap-4 font-label text-[10px] text-[#464652] uppercase tracking-widest pt-4 border-t border-[#464652]/15">
           <div className="flex gap-6">
@@ -566,25 +409,6 @@ export default function Home() {
         </footer>
       </main>
 
-      {/* ── MOBILE BOTTOM NAV ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex h-20 bg-[#0e0e0f]/95 backdrop-blur-xl border-t border-[#c0c1ff]/10"
-        style={{ boxShadow: '0 -10px 40px rgba(46,49,146,0.15)' }}>
-        <Link href="/" className="flex-1 flex flex-col items-center justify-center gap-1 bg-gradient-to-b from-[#2e3192]/60 to-transparent text-[#c0c1ff]">
-          <span className="text-lg">◈</span>
-          <span className="font-label text-[9px] uppercase tracking-widest">Leaderboard</span>
-        </Link>
-        <Link href="/claim" className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30 hover:text-[#c0c1ff] transition-colors">
-          <span className="text-lg">◇</span>
-          <span className="font-label text-[9px] uppercase tracking-widest">Claim</span>
-        </Link>
-        <Link href="/admin/dashboard" className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30 hover:text-[#c0c1ff] transition-colors">
-          <span className="text-lg">⊡</span>
-          <span className="font-label text-[9px] uppercase tracking-widest">Terminal</span>
-        </Link>
-        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[#e5e2e3]/30">
-          <ConnectButton />
-        </div>
-      </nav>
     </>
   )
 }

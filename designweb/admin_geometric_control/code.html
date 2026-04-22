@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Master Control Dashboard | ETH Cali</title>
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-highest": "#353436",
+                    "on-primary": "#1e2084",
+                    "on-secondary": "#2b2d51",
+                    "surface-container": "#201f20",
+                    "on-secondary-fixed-variant": "#424369",
+                    "surface-container-low": "#1c1b1c",
+                    "tertiary-fixed": "#ffdbcb",
+                    "error-container": "#93000a",
+                    "surface-dim": "#131314",
+                    "surface-variant": "#353436",
+                    "primary-container": "#2e3192",
+                    "outline": "#908f9d",
+                    "surface-tint": "#c0c1ff",
+                    "secondary-container": "#424369",
+                    "tertiary": "#ffb692",
+                    "surface-container-high": "#2a2a2b",
+                    "surface": "#131314",
+                    "surface-container-lowest": "#0e0e0f",
+                    "on-error-container": "#ffdad6",
+                    "on-primary-fixed": "#04006d",
+                    "on-tertiary-fixed": "#341100",
+                    "on-surface": "#e5e2e3",
+                    "on-error": "#690005",
+                    "primary-fixed-dim": "#c0c1ff",
+                    "primary": "#c0c1ff",
+                    "secondary": "#c2c3f0",
+                    "inverse-primary": "#4f54b4",
+                    "primary-fixed": "#e1e0ff",
+                    "surface-bright": "#3a393a",
+                    "inverse-surface": "#e5e2e3",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed-dim": "#ffb692",
+                    "on-primary-container": "#9da1ff",
+                    "tertiary-container": "#6c2a00",
+                    "on-background": "#e5e2e3",
+                    "on-secondary-container": "#b1b1dd",
+                    "on-surface-variant": "#c7c5d4",
+                    "on-tertiary": "#562000",
+                    "on-tertiary-fixed-variant": "#773207",
+                    "on-secondary-fixed": "#16183b",
+                    "inverse-on-surface": "#313031",
+                    "background": "#131314",
+                    "outline-variant": "#464652",
+                    "secondary-fixed": "#e1e0ff",
+                    "secondary-fixed-dim": "#c2c3f0",
+                    "on-tertiary-container": "#f19160",
+                    "on-primary-fixed-variant": "#373a9b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": [
+                            "Plus Jakarta Sans"
+                    ],
+                    "body": [
+                            "Space Grotesk"
+                    ],
+                    "label": [
+                            "Space Grotesk"
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        /* Base geometric pattern overlay */
+        .bg-geometric {
+            background-image: radial-gradient(circle at 50% 50%, rgba(192, 193, 255, 0.03) 0%, transparent 60%),
+                              linear-gradient(0deg, transparent 24%, rgba(46, 49, 146, 0.05) 25%, rgba(46, 49, 146, 0.05) 26%, transparent 27%, transparent 74%, rgba(46, 49, 146, 0.05) 75%, rgba(46, 49, 146, 0.05) 76%, transparent 77%, transparent),
+                              linear-gradient(90deg, transparent 24%, rgba(46, 49, 146, 0.05) 25%, rgba(46, 49, 146, 0.05) 26%, transparent 27%, transparent 74%, rgba(46, 49, 146, 0.05) 75%, rgba(46, 49, 146, 0.05) 76%, transparent 77%, transparent);
+            background-size: 100% 100%, 50px 50px, 50px 50px;
+        }
+
+        /* Ghost borders and precision styling */
+        .ghost-border {
+            border: 1px solid rgba(70, 70, 82, 0.15);
+        }
+        
+        .sacred-corner {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            border-top: 2px solid #C0C1FF;
+            border-right: 2px solid #C0C1FF;
+            opacity: 0.5;
+        }
+
+        /* Ambient Glows */
+        .ambient-glow {
+            box-shadow: 0 0 30px 10px rgba(46, 49, 146, 0.1);
+        }
+        
+        .active-glow {
+            box-shadow: 0 0 20px rgba(192, 193, 255, 0.3);
+        }
+
+        /* Typography strictness */
+        h1, h2, h3, h4, h5, h6 { font-family: 'Plus Jakarta Sans', sans-serif; }
+        body, p, span, div { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col font-body selection:bg-primary-container selection:text-primary pb-24 md:pb-0">
+<!-- Background Pattern -->
+<div class="fixed inset-0 z-[-1] bg-geometric pointer-events-none opacity-50"></div>
+<!-- TopAppBar -->
+<header class="bg-[#131314] dark:bg-[#131314] text-[#C0C1FF] font-plus-jakarta-sans font-bold tracking-[0.2em] uppercase rounded-none docked full-width top-0 bg-gradient-to-b from-[#131314] to-[#0E0E0F] shadow-[0_10px_30px_-15px_rgba(46,49,146,0.2)] flex justify-between items-center w-full px-6 py-4 max-w-full z-40 sticky">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container flex items-center justify-center border border-outline-variant/30 relative">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-container/20 to-transparent"></div>
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 1;">diamond</span>
+</div>
+<div class="flex flex-col">
+<span class="text-xl font-bold text-[#E5E2E3] tracking-widest leading-none">ETH CALI</span>
+<span class="text-[10px] text-primary/60 tracking-widest mt-1">Terminal</span>
+</div>
+</div>
+<!-- Desktop Navigation -->
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-[#E5E2E3]/50 hover:bg-[#2E3192]/20 hover:text-[#C0C1FF] transition-all px-4 py-2 text-xs flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm">leaderboard</span> Leaderboard
+            </a>
+<a class="text-[#E5E2E3]/50 hover:bg-[#2E3192]/20 hover:text-[#C0C1FF] transition-all px-4 py-2 text-xs flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm">hub</span> Networks
+            </a>
+<a class="text-[#C0C1FF] drop-shadow-[0_0_8px_#2E3192] px-4 py-2 text-xs flex items-center gap-2 relative" href="#">
+<div class="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary-container to-primary"></div>
+<span class="material-symbols-outlined text-sm">terminal</span> Terminal
+            </a>
+<a class="text-[#E5E2E3]/50 hover:bg-[#2E3192]/20 hover:text-[#C0C1FF] transition-all px-4 py-2 text-xs flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm">lock</span> Vault
+            </a>
+</nav>
+<button class="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary-container/20 transition-colors">
+<span class="material-symbols-outlined">settings_ethernet</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-8 relative">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-4">
+<div>
+<p class="text-primary font-label text-xs tracking-[0.3em] uppercase mb-2">// MASTER_CONTROL_NODE</p>
+<h1 class="font-headline text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight uppercase">System <br/>Reconciliation</h1>
+</div>
+<button class="bg-gradient-to-br from-primary-container to-primary text-surface-lowest px-8 py-4 uppercase font-bold tracking-widest text-sm flex items-center gap-3 hover:shadow-[0_0_20px_rgba(46,49,146,0.5)] transition-all rounded-none self-start md:self-auto relative group overflow-hidden">
+<div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<span class="material-symbols-outlined">sync</span>
+                EXECUTE_SYNC
+            </button>
+</div>
+<!-- Top Level KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- KPI 1 -->
+<div class="bg-surface-container-low p-6 relative ghost-border group hover:bg-surface-container transition-colors">
+<div class="sacred-corner"></div>
+<div class="flex justify-between items-start mb-8">
+<span class="text-on-surface-variant text-xs uppercase tracking-widest font-label">Total Users</span>
+<span class="material-symbols-outlined text-primary/50 text-sm">group</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-4xl font-bold text-on-surface">14,209</span>
+<span class="text-primary text-xs font-label">+2.4%</span>
+</div>
+<div class="mt-4 h-[1px] w-full bg-outline-variant/20"></div>
+<p class="mt-4 text-[10px] text-on-surface-variant font-label uppercase tracking-wider">Sync: 12s ago</p>
+</div>
+<!-- KPI 2 -->
+<div class="bg-surface-container-low p-6 relative ghost-border group hover:bg-surface-container transition-colors">
+<div class="sacred-corner"></div>
+<div class="flex justify-between items-start mb-8">
+<span class="text-on-surface-variant text-xs uppercase tracking-widest font-label">Active POAPs</span>
+<span class="material-symbols-outlined text-primary/50 text-sm">token</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-4xl font-bold text-on-surface">8,432</span>
+<span class="text-primary text-xs font-label">+1.1%</span>
+</div>
+<div class="mt-4 h-[1px] w-full bg-outline-variant/20"></div>
+<p class="mt-4 text-[10px] text-on-surface-variant font-label uppercase tracking-wider">Sync: 12s ago</p>
+</div>
+<!-- KPI 3 -->
+<div class="bg-surface-container-high p-6 relative ghost-border ambient-glow">
+<div class="absolute top-0 right-0 w-1/2 h-1/2 bg-gradient-to-bl from-primary-container/10 to-transparent pointer-events-none"></div>
+<div class="sacred-corner border-primary"></div>
+<div class="flex justify-between items-start mb-8">
+<span class="text-primary text-xs uppercase tracking-widest font-label drop-shadow-[0_0_5px_rgba(192,193,255,0.5)]">Network Health</span>
+<span class="material-symbols-outlined text-primary text-sm animate-pulse">health_and_safety</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="font-headline text-4xl font-bold text-primary">OPTIMAL</span>
+</div>
+<div class="mt-4 h-[1px] w-full bg-primary/20"></div>
+<p class="mt-4 text-[10px] text-primary/80 font-label uppercase tracking-wider">All nodes responding</p>
+</div>
+</div>
+<!-- Data Logs Matrix -->
+<div class="bg-surface-container-lowest ghost-border mt-4 relative">
+<!-- Header -->
+<div class="border-b border-outline-variant/20 px-6 py-4 flex justify-between items-center bg-surface-container-low/50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary/70">data_object</span>
+<h2 class="font-headline text-sm uppercase tracking-[0.2em] text-on-surface">Multi-Chain Event Matrix</h2>
+</div>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-surface-container text-[9px] uppercase tracking-widest text-on-surface-variant ghost-border">Base</span>
+<span class="px-2 py-1 bg-surface-container text-[9px] uppercase tracking-widest text-on-surface-variant ghost-border">OP</span>
+<span class="px-2 py-1 bg-surface-container text-[9px] uppercase tracking-widest text-on-surface-variant ghost-border">Zora</span>
+</div>
+</div>
+<!-- List Body -->
+<div class="flex flex-col">
+<!-- Row 1 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-surface-container-low transition-colors border-b border-outline-variant/10">
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">TIMESTAMP</span>
+<span class="text-xs text-on-surface font-label">14:02:45 UTC</span>
+</div>
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">NETWORK</span>
+<span class="text-xs text-primary font-bold tracking-wider">BASE</span>
+</div>
+<div class="col-span-6 md:col-span-5 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">EVENT_HASH</span>
+<span class="text-xs text-on-surface opacity-80 font-label truncate">0x8a7b...9c21</span>
+</div>
+<div class="col-span-12 md:col-span-3 flex justify-end md:justify-end items-center mt-2 md:mt-0">
+<span class="px-3 py-1 bg-primary-container/20 text-primary text-[10px] uppercase tracking-wider ghost-border flex items-center gap-1">
+<span class="w-1 h-1 bg-primary rounded-full"></span> VERIFIED
+                        </span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center bg-surface-container-low/20 hover:bg-surface-container-low transition-colors border-b border-outline-variant/10">
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">TIMESTAMP</span>
+<span class="text-xs text-on-surface font-label">14:01:12 UTC</span>
+</div>
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">NETWORK</span>
+<span class="text-xs text-error font-bold tracking-wider">OP</span>
+</div>
+<div class="col-span-6 md:col-span-5 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">EVENT_HASH</span>
+<span class="text-xs text-on-surface opacity-80 font-label truncate">0x3f4a...1b9e</span>
+</div>
+<div class="col-span-12 md:col-span-3 flex justify-end md:justify-end items-center mt-2 md:mt-0">
+<span class="px-3 py-1 bg-error-container/20 text-error text-[10px] uppercase tracking-wider ghost-border flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px]">warning</span> PENDING
+                        </span>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-surface-container-low transition-colors border-b border-outline-variant/10">
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">TIMESTAMP</span>
+<span class="text-xs text-on-surface font-label">13:58:33 UTC</span>
+</div>
+<div class="col-span-3 md:col-span-2 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">NETWORK</span>
+<span class="text-xs text-tertiary-fixed-dim font-bold tracking-wider">ZORA</span>
+</div>
+<div class="col-span-6 md:col-span-5 flex flex-col">
+<span class="text-[10px] text-on-surface-variant mb-1">EVENT_HASH</span>
+<span class="text-xs text-on-surface opacity-80 font-label truncate">0x9d2e...4f1a</span>
+</div>
+<div class="col-span-12 md:col-span-3 flex justify-end md:justify-end items-center mt-2 md:mt-0">
+<span class="px-3 py-1 bg-primary-container/20 text-primary text-[10px] uppercase tracking-wider ghost-border flex items-center gap-1">
+<span class="w-1 h-1 bg-primary rounded-full"></span> VERIFIED
+                        </span>
+</div>
+</div>
+</div>
+<div class="p-4 flex justify-center border-t border-outline-variant/20 bg-surface-container-lowest/50">
+<button class="text-xs text-primary/70 hover:text-primary uppercase tracking-widest flex items-center gap-2 transition-colors">
+                    Load Archive <span class="material-symbols-outlined text-sm">expand_more</span>
+</button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-[#0E0E0F]/90 backdrop-blur-xl text-[#C0C1FF] font-space-grotesk text-[10px] uppercase tracking-widest rounded-none fixed bottom-0 w-full z-50 bg-[#131314] border-t border-[#C0C1FF]/10 shadow-[0_-10px_40px_rgba(46,49,146,0.15)] flex justify-around items-center h-20">
+<a class="flex flex-col items-center justify-center text-[#E5E2E3]/40 px-6 py-2 hover:text-[#C0C1FF] hover:bg-[#131314] transition-colors w-1/4" href="#">
+<span class="material-symbols-outlined mb-1">leaderboard</span>
+<span class="truncate w-full text-center">Leaderboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#E5E2E3]/40 px-6 py-2 hover:text-[#C0C1FF] hover:bg-[#131314] transition-colors w-1/4" href="#">
+<span class="material-symbols-outlined mb-1">hub</span>
+<span class="truncate w-full text-center">Networks</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-gradient-to-br from-[#2E3192] to-[#131314] text-[#C0C1FF] px-6 py-2 shadow-[inset_0_0_10px_rgba(192,193,255,0.2)] w-1/4 relative" href="#">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary"></div>
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<span class="truncate w-full text-center">Terminal</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#E5E2E3]/40 px-6 py-2 hover:text-[#C0C1FF] hover:bg-[#131314] transition-colors w-1/4" href="#">
+<span class="material-symbols-outlined mb-1">lock</span>
+<span class="truncate w-full text-center">Vault</span>
+</a>
+</nav>
+</body></html>
